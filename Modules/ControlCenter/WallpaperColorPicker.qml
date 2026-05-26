@@ -23,9 +23,15 @@ Item {
     property real gradientY: 0
     property bool shouldBeVisible: false
     property string pickedColorOutput: ""
+    property int formatFieldResetRevision: 0
 
+    readonly property real dialogMargin: 14
     readonly property real dialogWidth: Math.max(560, Math.min(680, modalWindow.width - 64))
-    readonly property real dialogHeight: Math.min(720, Math.max(520, modalWindow.height - 64))
+    readonly property real dialogHeight: Math.max(620, Math.min(704, modalWindow.height - 64))
+    readonly property real paletteHeight: dialogHeight < 660 ? 220 : 250
+    readonly property real colorCellStride: Math.floor((dialogWidth - dialogMargin * 2) / 17)
+    readonly property real colorCellSize: Math.max(28, Math.min(36, colorCellStride - 2))
+    readonly property real colorGridHeight: (colorCellSize + 2) * 3
     readonly property var standardColors: ["#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", "#ff5722", "#d32f2f", "#c2185b", "#7b1fa2", "#512da8", "#303f9f", "#1976d2", "#0288d1", "#0097a7", "#00796b", "#388e3c", "#689f38", "#afb42b", "#fbc02d", "#ffa000", "#f57c00", "#e64a19", "#c62828", "#ad1457", "#6a1b9a", "#4527a0", "#283593", "#1565c0", "#0277bd", "#00838f", "#00695c", "#2e7d32", "#558b2f", "#9e9d24", "#f9a825", "#ff8f00", "#ef6c00", "#d84315", "#ffffff", "#9e9e9e", "#212121"]
 
     signal colorSelected(string color)
@@ -57,7 +63,12 @@ Item {
     }
 
     function close() {
+        root.formatFieldResetRevision += 1;
         shouldBeVisible = false;
+    }
+
+    function hexTextIsValid(value) {
+        return /^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(String(value || "").trim());
     }
 
     function updateFromColor(colorValue) {
@@ -188,17 +199,15 @@ Item {
                 event.accepted = true;
             }
 
-            StyledFlickable {
+            Item {
                 anchors.fill: parent
-                anchors.margins: 16
-                contentWidth: width
-                contentHeight: mainColumn.implicitHeight
+                anchors.margins: root.dialogMargin
 
                 ColumnLayout {
                     id: mainColumn
 
                     width: parent.width
-                    spacing: 14
+                    spacing: 8
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -212,7 +221,7 @@ Item {
                                 text: root.pickerTitle
                                 color: Appearance.colors.colOnSurface
                                 font.family: Sizes.fontFamily
-                                font.pixelSize: 19
+                                font.pixelSize: 18
                                 font.weight: Font.Medium
                             }
 
@@ -247,7 +256,7 @@ Item {
                             id: gradientPicker
 
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 280
+                            Layout.preferredHeight: root.paletteHeight
                             radius: Appearance.rounding.normal
                             border.color: Appearance.colors.colOutline
                             border.width: 1
@@ -322,8 +331,8 @@ Item {
                         Rectangle {
                             id: hueSlider
 
-                            Layout.preferredWidth: 50
-                            Layout.preferredHeight: 280
+                            Layout.preferredWidth: 46
+                            Layout.preferredHeight: root.paletteHeight
                             radius: Appearance.rounding.normal
                             border.color: Appearance.colors.colOutline
                             border.width: 1
@@ -366,14 +375,14 @@ Item {
                     }
 
                     SectionLabel {
-                        text: "Material Colors"
+                        text: "material 配色"
                     }
 
                     StyledGridView {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 152
-                        cellWidth: 38
-                        cellHeight: 38
+                        Layout.preferredHeight: root.colorGridHeight
+                        cellWidth: root.colorCellStride
+                        cellHeight: root.colorCellSize + 2
                         clip: true
                         interactive: false
                         animateAppearance: false
@@ -385,8 +394,8 @@ Item {
                         delegate: Rectangle {
                             required property string modelData
 
-                            width: 36
-                            height: 36
+                            width: root.colorCellSize
+                            height: root.colorCellSize
                             radius: 4
                             color: modelData
                             border.color: Appearance.colors.colOutline
@@ -409,11 +418,12 @@ Item {
                         spacing: 14
 
                         ColumnLayout {
+                            Layout.alignment: Qt.AlignTop
                             Layout.preferredWidth: 210
                             spacing: 8
 
                             SectionLabel {
-                                text: "Recent Colors"
+                                text: "最近拾取的颜色"
                             }
 
                             RowLayout {
@@ -447,25 +457,28 @@ Item {
                         }
 
                         ColumnLayout {
+                            Layout.alignment: Qt.AlignTop
                             Layout.fillWidth: true
                             spacing: 8
 
                             SectionLabel {
-                                text: "Opacity"
+                                text: "透明度"
                             }
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 12
+                                spacing: 10
 
-                                Slider {
+                                MaterialSplitSlider {
                                     Layout.fillWidth: true
                                     from: 0
                                     to: 100
+                                    stepSize: 1
                                     value: Math.round(root.alpha * 100)
-                                    Material.accent: Appearance.colors.colPrimary
+                                    configuration: MaterialSplitSlider.Configuration.M
+                                    tooltipContent: Math.round(value) + "%"
                                     onMoved: {
-                                        root.alpha = value / 100;
+                                        root.alpha = root.clamp01(value / 100);
                                         root.updateColor();
                                     }
                                 }
@@ -480,8 +493,8 @@ Item {
                                 }
 
                                 Rectangle {
-                                    Layout.preferredWidth: 74
-                                    Layout.preferredHeight: 50
+                                    Layout.preferredWidth: 68
+                                    Layout.preferredHeight: 46
                                     radius: Appearance.rounding.normal
                                     color: root.currentColor
                                     border.color: Appearance.colors.colOutline
@@ -499,6 +512,7 @@ Item {
                             title: "Hex"
                             value: root.colorToHex(root.currentColor)
                             editable: true
+                            validateHex: true
                             onAccepted: text => {
                                 const normalized = root.normalizeHex(text);
                                 if (normalized === "")
@@ -524,7 +538,7 @@ Item {
 
                     Button {
                         Layout.alignment: Qt.AlignRight
-                        text: "Save"
+                        text: "保存"
                         Material.background: Appearance.colors.colPrimary
                         Material.foreground: Appearance.colors.colOnPrimary
                         onClicked: {
@@ -606,6 +620,7 @@ Item {
         property string title: ""
         property string value: ""
         property bool editable: false
+        property bool validateHex: false
 
         signal accepted(string text)
         signal copyRequested(string text)
@@ -630,18 +645,33 @@ Item {
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 36
-                text: formatField.value
+                text: {
+                    root.formatFieldResetRevision;
+                    return formatField.value;
+                }
                 readOnly: !formatField.editable
                 selectByMouse: true
                 Material.accent: Appearance.colors.colPrimary
                 Material.background: Appearance.colors.colLayer2
-                Material.foreground: Appearance.colors.colOnSurface
+                Material.foreground: formatField.validateHex && text.length > 0 && !root.hexTextIsValid(text)
+                    ? Appearance.m3colors.m3error
+                    : Appearance.colors.colOnSurface
                 font.family: Sizes.fontFamilyMono
                 font.pixelSize: 13
                 onAccepted: formatField.accepted(text)
                 onEditingFinished: {
                     if (formatField.editable)
                         formatField.accepted(text);
+                }
+
+                Connections {
+                    target: root
+
+                    function onFormatFieldResetRevisionChanged() {
+                        input.deselect();
+                        input.cursorPosition = 0;
+                        input.focus = false;
+                    }
                 }
             }
 

@@ -291,10 +291,37 @@ cursor {
         generateColorsProcess.running = true;
     }
 
+    function opaqueHexFromColor(value) {
+        const color = Qt.color(value);
+        const r = Math.round(Math.max(0, Math.min(1, color.r)) * 255).toString(16).padStart(2, "0");
+        const g = Math.round(Math.max(0, Math.min(1, color.g)) * 255).toString(16).padStart(2, "0");
+        const b = Math.round(Math.max(0, Math.min(1, color.b)) * 255).toString(16).padStart(2, "0");
+        return "#" + r + g + b;
+    }
+
+    function generateFromColor(value) {
+        if (!value || value === "")
+            return;
+
+        const sourceColor = root.opaqueHexFromColor(value);
+        root.applyConfigToAppearance();
+        root.lastSource = value;
+        generateColorsProcess.command = [
+            "bash", Paths.scriptPath("theme", "generate_quickshell_colors.sh"),
+            "--color", sourceColor,
+            "--scheme", PersonalizationConfig.matugenScheme,
+            "--mode", PersonalizationConfig.themeMode
+        ];
+        generateColorsProcess.running = false;
+        generateColorsProcess.running = true;
+    }
+
     function regenerateFromCurrentWallpaper() {
         const path = WallpaperService.currentWallpaper || PersonalizationConfig.wallpaperPath;
         if (path && path !== "" && WallpaperService.isImagePath(path))
             root.generateFromWallpaper(path);
+        else if (path && path !== "" && WallpaperService.isColorSource(path))
+            root.generateFromColor(path);
     }
 
     Component.onCompleted: {

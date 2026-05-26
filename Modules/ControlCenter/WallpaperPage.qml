@@ -370,8 +370,7 @@ StyledFlickable {
 
                     Rectangle {
                         anchors.fill: parent
-                        anchors.margins: 1
-                        radius: Appearance.rounding.normal - 1
+                        radius: Appearance.rounding.normal
                         color: Qt.rgba(0, 0, 0, 0.7)
                         opacity: previewHover.hovered ? 1 : 0
 

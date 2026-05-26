@@ -166,6 +166,8 @@ Singleton {
 
         if (root.isImagePath(path))
             ThemeService.generateFromWallpaper(path);
+        else if (root.isColorSource(path))
+            ThemeService.generateFromColor(path);
         else
             root.switching = false;
 
