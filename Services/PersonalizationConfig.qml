@@ -71,6 +71,7 @@ Singleton {
     property bool perMonitorWallpaper: false
     property var monitorWallpapers: ({})
     property var monitorWallpaperFillModes: ({})
+    property var recentWallpaperColors: []
     property string wallpaperFillMode: "Fill"
 
     property bool autoCycleEnabled: false
@@ -153,6 +154,19 @@ Singleton {
         return result;
     }
 
+    function normalizedRecentColors(raw) {
+        if (!Array.isArray(raw))
+            return [];
+
+        const result = [];
+        for (let i = 0; i < raw.length && result.length < 5; i += 1) {
+            const value = String(raw[i] || "").trim().toLowerCase();
+            if (/^#([0-9a-f]{6}|[0-9a-f]{8})$/.test(value) && result.indexOf(value) === -1)
+                result.push(value);
+        }
+        return result;
+    }
+
     function setValue(propertyName, value) {
         if (root[propertyName] === value)
             return;
@@ -215,6 +229,22 @@ Singleton {
         if (!screenName || !root.monitorWallpaperFillModes)
             return root.wallpaperFillMode;
         return root.monitorWallpaperFillModes[screenName] || root.wallpaperFillMode;
+    }
+
+    function addRecentWallpaperColor(color) {
+        const value = String(color || "").trim().toLowerCase();
+        if (!/^#([0-9a-f]{6}|[0-9a-f]{8})$/.test(value))
+            return;
+
+        const next = [value];
+        const source = normalizedRecentColors(root.recentWallpaperColors);
+        for (let i = 0; i < source.length && next.length < 5; i += 1) {
+            if (source[i] !== value)
+                next.push(source[i]);
+        }
+
+        root.recentWallpaperColors = next;
+        root.save();
     }
 
     function setAutoCycleEnabled(value) {
@@ -342,6 +372,7 @@ Singleton {
                 "perMonitor": root.perMonitorWallpaper,
                 "monitorWallpapers": root.monitorWallpapers,
                 "monitorFillModes": root.monitorWallpaperFillModes,
+                "recentColors": root.recentWallpaperColors,
                 "fillMode": root.wallpaperFillMode,
                 "autoCycle": {
                     "enabled": root.autoCycleEnabled,
@@ -393,6 +424,7 @@ Singleton {
         root.perMonitorWallpaper = !!wallpaper.perMonitor;
         root.monitorWallpapers = cloneMap(wallpaper.monitorWallpapers);
         root.monitorWallpaperFillModes = cloneMap(wallpaper.monitorFillModes);
+        root.recentWallpaperColors = normalizedRecentColors(wallpaper.recentColors);
         root.wallpaperFillMode = normalizedOption(root.fillModes, wallpaper.fillMode, "Fill");
         root.autoCycleEnabled = !!autoCycle.enabled;
         root.autoCycleMode = autoCycle.mode === "time" ? "time" : "interval";
