@@ -69,7 +69,10 @@ Variants {
                 SysMonitor { Layout.alignment: Qt.AlignVCenter }
                 
 
-                QuickSettings { Layout.alignment: Qt.AlignVCenter }
+                QuickSettings {
+                    screen: barWindow.screen
+                    Layout.alignment: Qt.AlignVCenter
+                }
                 
                 
             }

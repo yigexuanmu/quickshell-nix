@@ -5,6 +5,8 @@ import qs.Common
 
 Item {
     id: root
+
+    property var screen: null
     
     // 维持 36 的高度
     implicitHeight: 36
@@ -33,10 +35,21 @@ Item {
         spacing: 8 
         
         // 直接调用同目录下的组件，无需 import
-        Network {}
-        Brightness {}
-        Volume {}
-        SettingsButton {}
+        Network {
+            screen: root.screen
+        }
+        Brightness {
+            screen: root.screen
+        }
+        Volume {
+            screen: root.screen
+        }
+        Microphone {
+            screen: root.screen
+        }
+        SettingsButton {
+            screen: root.screen
+        }
         PowerButton {}
     }
 }

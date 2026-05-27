@@ -7,6 +7,8 @@ import qs.Widgets.common
 Item {
     id: root
 
+    property var screen: null
+
     implicitHeight: 28
     implicitWidth: 28
 
@@ -41,6 +43,8 @@ Item {
             Volume.setSinkVolume(newVol)
         }
         onClicked: {
+            if (root.screen && root.screen.name)
+                WidgetState.qsScreenName = root.screen.name;
             if (WidgetState.qsOpen && WidgetState.qsView === "audio") {
                 WidgetState.qsOpen = false;
             } else {

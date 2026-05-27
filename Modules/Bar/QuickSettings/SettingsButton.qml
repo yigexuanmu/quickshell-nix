@@ -7,6 +7,7 @@ import qs.Widgets.common
 Item {
     id: root
 
+    property var screen: null
     property bool isHovered: mouseArea.containsMouse
     readonly property bool active: WidgetState.qsOpen && WidgetState.qsView === "settings"
     readonly property int buttonSize: 28
@@ -42,6 +43,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
+            if (root.screen && root.screen.name)
+                WidgetState.qsScreenName = root.screen.name;
             if (root.active) {
                 WidgetState.qsOpen = false;
             } else {
