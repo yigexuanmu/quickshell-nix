@@ -1,297 +1,424 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects  // 引入现代 Qt 6 特效库
 import Quickshell
-import qs.Common 
+import Quickshell.Wayland
+import qs.Common
+import qs.Components
+import qs.Services
+import qs.Widgets.common
 
-PopupWindow {
+PanelWindow {
     id: root
 
-    property var rootMenuHandle: null
-    property string trayName: ""
-    
-    implicitWidth: 240
-    implicitHeight: Math.min(600, mainLayout.implicitHeight + 20)
+    property var trayItemMenuHandle: null
+    property string trayItemId: ""
+    property var anchorItem: null
+    property real padding: 10
+    property real edgeMargin: 10
+    property real anchorGap: 4
+    property real menuX: edgeMargin
+    property real menuY: edgeMargin
+
+    signal menuClosed()
+    signal menuOpened(var qsWindow)
+
+    visible: false
     color: "transparent"
-    
+    exclusiveZone: -1
+
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.namespace: "clavis-tray-menu"
+    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
+
+    mask: Region { item: inputRegion }
+
+    function clamp(value, minimum, maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    function updatePosition() {
+        const surfaceWidth = Math.max(1, menuSurface.implicitWidth);
+        const surfaceHeight = Math.max(1, menuSurface.implicitHeight);
+        const availableWidth = Math.max(surfaceWidth + root.edgeMargin * 2, root.width);
+        const availableHeight = Math.max(surfaceHeight + root.edgeMargin * 2, root.height);
+
+        if (!root.anchorItem) {
+            root.menuX = root.clamp((availableWidth - surfaceWidth) / 2, root.edgeMargin, availableWidth - surfaceWidth - root.edgeMargin);
+            root.menuY = root.edgeMargin;
+            return;
+        }
+
+        const globalPos = root.anchorItem.mapToGlobal(0, 0);
+        const screenX = root.screen ? (root.screen.x || 0) : 0;
+        const screenY = root.screen ? (root.screen.y || 0) : 0;
+        const anchorX = globalPos.x - screenX;
+        const anchorY = globalPos.y - screenY;
+        const anchorWidth = root.anchorItem.width || 0;
+        const anchorHeight = root.anchorItem.height || 0;
+
+        root.menuX = root.clamp(
+            anchorX + anchorWidth / 2 - surfaceWidth / 2,
+            root.edgeMargin,
+            availableWidth - surfaceWidth - root.edgeMargin
+        );
+
+        const belowY = anchorY + anchorHeight + root.anchorGap;
+        const aboveY = anchorY - surfaceHeight - root.anchorGap;
+        const maxY = availableHeight - surfaceHeight - root.edgeMargin;
+        root.menuY = belowY <= maxY || aboveY < root.edgeMargin
+            ? root.clamp(belowY, root.edgeMargin, maxY)
+            : root.clamp(aboveY, root.edgeMargin, maxY);
+    }
+
+    function open() {
+        root.visible = true;
+        root.menuOpened(root);
+        Qt.callLater(() => {
+            root.updatePosition();
+            keyScope.forceActiveFocus();
+        });
+    }
+
+    function close() {
+        if (!root.visible && stackView.depth <= 1)
+            return;
+
+        actionCloseTimer.stop();
+        root.visible = false;
+        while (stackView.depth > 1)
+            stackView.pop();
+        root.menuClosed();
+    }
+
     onVisibleChanged: {
-        if (visible) {
-            menuStack.clear()
-        }
-    }
-
-    // --- 1. 状态堆栈 ---
-    ListModel {
-        id: menuStack
-    }
-
-    property var currentSubMenuHandle: {
-        if (menuStack.count === 0) return null
-        return menuStack.get(menuStack.count - 1).handle
-    }
-
-    // --- 2. 双通道数据源 ---
-    QsMenuOpener {
-        id: rootOpener
-        menu: root.rootMenuHandle
-    }
-
-    QsMenuOpener {
-        id: subOpener
-        menu: root.currentSubMenuHandle
-    }
-
-    // --- 3. 隐形数据激活器 (Hydrator) ---
-    QsMenuAnchor {
-        id: hydrator
-        anchor.window: root
-        anchor.item: mainLayout
-        // 设为当前窗口中心，防止 Wayland 强制推到屏幕左上角
-        anchor.rect.x: root.width / 2
-        anchor.rect.y: root.height / 2
-        // 设为极小尺寸
-        anchor.rect.width: 1
-        anchor.rect.height: 1
-    }
-
-    // --- 4. 导航逻辑 ---
-    function navigateToSubmenu(menuHandle, menuText) {
-        if (!menuHandle) return
-
-        menuStack.append({ "handle": menuHandle, "title": menuText })
-
-        try {
-            // 1. 标准 API 调用
-            if (typeof menuHandle.aboutToShow === "function") menuHandle.aboutToShow()
-            if (typeof menuHandle.updateLayout === "function") menuHandle.updateLayout()
-            
-            // 2. 暴力激活 (瞬时开关)
-            hydrator.menu = menuHandle
-            hydrator.open()
-            
-            // 【Bug 修复核心】：引入 Qt.callLater 延迟关闭
-            // 确保 DBus 有足够的时间将子菜单数据发送过来，防止 NetworkManager 等组件卡在 Loading...
+        if (visible)
             Qt.callLater(() => {
-                // 安全检查：确保关闭的是同一个菜单的 Hydrator
-                if (hydrator.menu === menuHandle) {
-                    hydrator.close()
-                }
-            })
-            
-        } catch (e) {
-            console.warn("Hydrator error:", e)
-        }
+                root.updatePosition();
+                keyScope.forceActiveFocus();
+            });
     }
 
-    function navigateBack() {
-        if (menuStack.count > 0) {
-            menuStack.remove(menuStack.count - 1, 1)
-        }
-    }
-
-    // --- 界面渲染 ---
-    Rectangle {
+    Item {
+        id: inputRegion
         anchors.fill: parent
-        // [背景] 深色容器背景
-        color: Appearance.m3colors.m3surfaceContainer
-        radius: 12
-        border.width: 1
-        // [边框] 使用 Outline 颜色
-        border.color: Appearance.m3colors.m3outlineVariant
-        clip: true 
+    }
 
-        ColumnLayout {
-            id: mainLayout
-            width: parent.width
-            spacing: 0
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.visible
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        z: -1
 
-            // --- 标题栏 ---
+        onClicked: event => {
+            const outsideMenu = event.x < menuSurface.x
+                || event.x > menuSurface.x + menuSurface.width
+                || event.y < menuSurface.y
+                || event.y > menuSurface.y + menuSurface.height;
+            if (outsideMenu)
+                root.close();
+        }
+    }
+
+    FocusScope {
+        id: keyScope
+
+        anchors.fill: parent
+        focus: root.visible
+
+        Keys.onEscapePressed: event => {
+            if (stackView.depth > 1)
+                stackView.pop();
+            else
+                root.close();
+            event.accepted = true;
+        }
+
+        QsMenuAnchor {
+            id: submenuHydrator
+            anchor.window: root
+        }
+
+        Timer {
+            id: actionCloseTimer
+            interval: 80
+            repeat: false
+            onTriggered: root.close()
+        }
+
+        Item {
+            id: menuSurface
+
+            x: root.menuX
+            y: root.menuY
+            implicitWidth: popupBackground.implicitWidth + root.padding * 2
+            implicitHeight: popupBackground.implicitHeight + root.padding * 2
+            width: implicitWidth
+            height: implicitHeight
+
+            onImplicitWidthChanged: Qt.callLater(root.updatePosition)
+            onImplicitHeightChanged: Qt.callLater(root.updatePosition)
+
+            StyledRectangularShadow {
+                target: popupBackground
+                opacity: popupBackground.opacity
+            }
+
             Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 40
-                color: "transparent"
-                
-                // 标题文本
-                Text {
-                    text: (menuStack.count === 0) ? (root.trayName || "Menu") : menuStack.get(menuStack.count - 1).title
-                    anchors.centerIn: parent
-                    font.bold: true
-                    color: Appearance.colors.colPrimary
-                    font.pixelSize: 15
-                    width: parent.width - 60
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
+                id: popupBackground
+
+                readonly property real popupPadding: 4
+
+                x: root.padding
+                y: root.padding
+                implicitWidth: stackView.implicitWidth + popupPadding * 2
+                implicitHeight: stackView.implicitHeight + popupPadding * 2
+                color: Appearance.colors.colLayer0
+                radius: 18
+                border.width: 1
+                border.color: Appearance.colors.colLayer0Border
+                clip: true
+                opacity: 0
+
+                Component.onCompleted: opacity = 1
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        alwaysRunToEnd: true
+                        duration: Appearance.animation.expressiveEffects.duration
+                        easing.type: Appearance.animation.expressiveEffects.type
+                        easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
+                    }
+                }
+                Behavior on implicitWidth {
+                    NumberAnimation {
+                        alwaysRunToEnd: true
+                        duration: Appearance.animation.elementResize.duration
+                        easing.type: Appearance.animation.elementResize.type
+                        easing.bezierCurve: Appearance.animation.elementResize.bezierCurve
+                    }
+                }
+                Behavior on implicitHeight {
+                    NumberAnimation {
+                        alwaysRunToEnd: true
+                        duration: Appearance.animation.elementResize.duration
+                        easing.type: Appearance.animation.elementResize.type
+                        easing.bezierCurve: Appearance.animation.elementResize.bezierCurve
+                    }
                 }
 
-                // 返回按钮
-                Rectangle {
-                    visible: menuStack.count > 0
-                    anchors.left: parent.left
-                    anchors.leftMargin: 6
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 28
-                    height: 28
-                    radius: 6
-                    color: backMa.containsMouse ? Appearance.colors.colSecondaryContainer : "transparent"
+                StackView {
+                    id: stackView
+
+                    anchors {
+                        fill: parent
+                        margins: popupBackground.popupPadding
+                    }
+
+                    implicitWidth: currentItem ? currentItem.implicitWidth : 0
+                    implicitHeight: currentItem ? currentItem.implicitHeight : 0
+
+                    onImplicitWidthChanged: Qt.callLater(root.updatePosition)
+                    onImplicitHeightChanged: Qt.callLater(root.updatePosition)
+
+                    pushEnter: NoAnim {}
+                    pushExit: NoAnim {}
+                    popEnter: NoAnim {}
+                    popExit: NoAnim {}
+
+                    initialItem: SubMenu {
+                        handle: root.trayItemMenuHandle
+                    }
+                }
+            }
+        }
+    }
+
+    component NoAnim: Transition {
+        NumberAnimation { duration: 0 }
+    }
+
+    component SubMenu: ColumnLayout {
+        id: submenu
+
+        required property var handle
+        property bool isSubMenu: false
+        property bool shown: false
+        readonly property var menuEntries: menuOpener.children ? menuOpener.children.values : []
+
+        opacity: shown ? 1 : 0
+        spacing: 0
+
+        Behavior on opacity {
+            NumberAnimation {
+                alwaysRunToEnd: true
+                duration: Appearance.animation.expressiveEffects.duration
+                easing.type: Appearance.animation.expressiveEffects.type
+                easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
+            }
+        }
+
+        Component.onCompleted: shown = true
+        StackView.onActivating: shown = true
+        StackView.onDeactivating: shown = false
+        StackView.onRemoved: destroy()
+
+        QsMenuOpener {
+            id: menuOpener
+            menu: submenu.handle ? (submenu.handle.menu || submenu.handle) : null
+        }
+
+        Loader {
+            Layout.fillWidth: true
+            visible: submenu.isSubMenu
+            active: visible
+
+            sourceComponent: MaterialRippleButton {
+                id: backButton
+
+                buttonRadius: popupBackground.radius - popupBackground.popupPadding
+                colBackground: Appearance.transparentize(Appearance.colors.colLayer0, 1)
+                colBackgroundHover: Appearance.colors.colLayer0Hover
+                colRipple: Appearance.colors.colLayer0Active
+                implicitWidth: backContent.implicitWidth + 24
+                implicitHeight: 36
+                Layout.fillWidth: true
+                releaseAction: () => stackView.pop()
+
+                contentItem: RowLayout {
+                    id: backContent
+
+                    anchors {
+                        verticalCenter: parent.verticalCenter
+                        left: parent.left
+                        right: parent.right
+                        leftMargin: 12
+                        rightMargin: 12
+                    }
+                    spacing: 8
+
+                    MaterialSymbol {
+                        text: "chevron_left"
+                        iconSize: 20
+                        color: Appearance.colors.colOnLayer0
+                    }
 
                     Text {
-                        text: "⬅" 
-                        anchors.centerIn: parent
-                        color: Appearance.colors.colOnSecondaryContainer
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        id: backMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.navigateBack()
-                    }
-                }
-                
-                // 分割线
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Appearance.colors.colPrimary
-                    opacity: 0.2
-                }
-            }
-
-            // --- 列表内容 ---
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.margins: 6 
-                spacing: 4        
-                
-                property var currentModel: (menuStack.count === 0) ?
-                                         (rootOpener.children ? rootOpener.children.values : []) : 
-                                         (subOpener.children ? subOpener.children.values : [])
-
-                Text {
-                    visible: (!parent.currentModel || parent.currentModel.length === 0)
-                    text: (menuStack.count > 0) ? "Loading..." : "No Items"
-                    color: Appearance.colors.colSecondary
-                    font.italic: true
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.margins: 10
-                }
-
-                Repeater {
-                    model: parent.currentModel
-
-                    delegate: Rectangle {
-                        id: menuItem
-                        property bool isSeparator: (modelData.isSeparator === true || modelData.text === "")
-                        property bool hasSubMenu: (modelData.hasChildren === true)
-                        property var effectiveHandle: (modelData.menu) ? modelData.menu : modelData
-
+                        text: "Back"
+                        color: Appearance.colors.colOnLayer0
+                        font.family: Sizes.fontFamily
+                        font.pixelSize: 13
                         Layout.fillWidth: true
-                        Layout.preferredHeight: isSeparator ? 9 : 36 
-                        radius: 8
-                        
-                        // [交互] 悬停背景
-                        color: (itemMa.containsMouse && !isSeparator) ? Appearance.colors.colSecondaryContainer : "transparent"
-                        Behavior on color { ColorAnimation { duration: 100 } }
-
-                        // 分割线
-                        Rectangle {
-                            visible: parent.isSeparator
-                            anchors.centerIn: parent
-                            width: parent.width - 20
-                            height: 1
-                            color: Appearance.colors.colOutlineVariant
-                            opacity: 0.5
-                        }
-
-                        // 内容行
-                        RowLayout {
-                            visible: !parent.isSeparator
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 12
-
-                            // 1. 图标 (染色处理)
-                            Item {
-                                Layout.preferredWidth: 16
-                                Layout.preferredHeight: 16
-                                visible: (modelData.icon || "") !== ""
-                                
-                                Image {
-                                    id: iconRaw
-                                    anchors.fill: parent
-                                    source: modelData.icon || ""
-                                    visible: false 
-                                    fillMode: Image.PreserveAspectFit
-                                }
-                                
-                                // [优化] 使用 MultiEffect 替换老旧的 ColorOverlay
-                                MultiEffect {
-                                    source: iconRaw
-                                    anchors.fill: iconRaw
-                                    visible: iconRaw.status === Image.Ready
-                                    colorization: 1.0 
-                                    colorizationColor: itemMa.containsMouse ?
-                                        Appearance.colors.colOnSecondaryContainer : Appearance.colors.colSecondary
-                                }
-                            }
-
-                            // 2. 勾选状态
-                            Text {
-                                visible: modelData.toggleState === 1
-                                text: "✔"
-                                color: Appearance.colors.colPrimary
-                                font.bold: true
-                            }
-
-                            // 3. 文本
-                            Text {
-                                text: modelData.text || ""
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                                color: {
-                                    if (modelData.enabled === false) return Appearance.colors.colOutline;
-                                    if (itemMa.containsMouse) return Appearance.colors.colOnSecondaryContainer;
-                                    return Appearance.colors.colOnSurface;
-                                }
-                                font.pixelSize: 14
-                                font.weight: itemMa.containsMouse ? Font.DemiBold : Font.Normal
-                            }
-
-                            // 4. 子菜单箭头
-                            Text {
-                                visible: hasSubMenu
-                                text: "›"
-                                font.pixelSize: 20
-                                font.bold: true
-                                color: itemMa.containsMouse ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colTertiary
-                            }
-                        }
-
-                        MouseArea {
-                            id: itemMa
-                            visible: !parent.isSeparator
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            enabled: modelData.enabled !== false
-
-                            onClicked: {
-                                if (hasSubMenu) {
-                                    root.navigateToSubmenu(effectiveHandle, modelData.text)
-                                } else {
-                                    modelData.triggered()
-                                    root.visible = false
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
+
+        MaterialRippleButton {
+            id: pinEntry
+
+            visible: root.trayItemId.length > 0 && stackView.depth === 1
+            buttonRadius: popupBackground.radius - popupBackground.popupPadding
+            colBackground: Appearance.transparentize(Appearance.colors.colLayer0, 1)
+            colBackgroundHover: Appearance.colors.colLayer0Hover
+            colRipple: Appearance.colors.colLayer0Active
+            implicitWidth: pinContent.implicitWidth + 24
+            implicitHeight: 36
+            Layout.fillWidth: true
+            releaseAction: () => TrayService.togglePin(root.trayItemId)
+
+            contentItem: RowLayout {
+                id: pinContent
+
+                anchors {
+                    verticalCenter: parent.verticalCenter
+                    left: parent.left
+                    right: parent.right
+                    leftMargin: 12
+                    rightMargin: 12
+                }
+                spacing: 8
+
+                MaterialSymbol {
+                    text: "push_pin"
+                    iconSize: 18
+                    color: Appearance.colors.colOnLayer0
+                }
+
+                Text {
+                    text: TrayService.isPinned(root.trayItemId) ? "Unpin" : "Pin"
+                    color: Appearance.colors.colOnLayer0
+                    font.family: Sizes.fontFamily
+                    font.pixelSize: 13
+                    Layout.fillWidth: true
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 1
+            color: Appearance.colors.colSubtext
+            Layout.topMargin: 4
+            Layout.bottomMargin: 4
+        }
+
+        Repeater {
+            id: menuEntriesRepeater
+
+            property bool iconColumnNeeded: {
+                for (let i = 0; i < submenu.menuEntries.length; i += 1) {
+                    if ((submenu.menuEntries[i].icon || "").length > 0)
+                        return true;
+                }
+                return false;
+            }
+            property bool specialInteractionColumnNeeded: {
+                for (let i = 0; i < submenu.menuEntries.length; i += 1) {
+                    if (submenu.menuEntries[i].buttonType !== QsMenuButtonType.None)
+                        return true;
+                }
+                return false;
+            }
+
+            model: menuOpener.children
+
+            delegate: TrayMenuEntry {
+                required property var modelData
+
+                menuEntry: modelData
+                forceIconColumn: menuEntriesRepeater.iconColumnNeeded
+                forceSpecialInteractionColumn: menuEntriesRepeater.specialInteractionColumnNeeded
+                buttonRadius: popupBackground.radius - popupBackground.popupPadding
+
+                onDismiss: actionCloseTimer.restart()
+                onOpenSubmenu: handle => {
+                    const menuHandle = handle ? (handle.menu || handle) : null;
+                    if (menuHandle && typeof menuHandle.updateLayout === "function")
+                        menuHandle.updateLayout();
+                    submenuHydrator.menu = menuHandle;
+                    submenuHydrator.open();
+                    Qt.callLater(() => submenuHydrator.close());
+                    stackView.push(subMenuComponent.createObject(null, {
+                        "handle": handle,
+                        "isSubMenu": true
+                    }));
+                    Qt.callLater(root.updatePosition);
+                }
+            }
+        }
+    }
+
+    Component {
+        id: subMenuComponent
+        SubMenu {}
     }
 }

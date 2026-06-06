@@ -2,7 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import Quickshell
 import qs.Common
+import qs.Components
+import qs.Widgets.common
 
 Item {
     id: root
@@ -17,11 +20,16 @@ Item {
     property int playbackDirection: 1
     property real playhead: 0
     property int playDurationMs: 1000
-    property string editText: ""
-    property bool editTextInvalid: false
     property int editingCoordinate: -1
     property string coordinateDraft: ""
     property bool coordinateInvalid: false
+    property real renderX1: 0.43
+    property real renderY1: 1.19
+    property real renderX2: 1.0
+    property real renderY2: 0.4
+    property var animationTargetCurve: [0.43, 1.19, 1.0, 0.4, 1, 1]
+    property bool curveAnimationActive: false
+    property bool curveAnimationCommit: false
     property color chartSurfaceColor: Appearance.m3colors.m3surfaceContainerLowest
     property color chartAxisColor: Appearance.colors.colOnSurfaceVariant
     property color chartPrimaryColor: Appearance.colors.colPrimary
@@ -42,17 +50,112 @@ Item {
         return clamp(value, 0, 1);
     }
 
-    function control(index, fallback) {
-        const value = Number(workingCurve[index]);
-        return isNaN(value) ? fallback : value;
+    function defaultCurve() {
+        return [0.43, 1.19, 1.0, 0.4, 1, 1];
+    }
+
+    function normalizedCurve(source) {
+        const defaults = defaultCurve();
+        const next = [];
+        for (let i = 0; i < 6; i += 1) {
+            const value = source && source.length > i ? Number(source[i]) : defaults[i];
+            next.push(isFinite(value) ? value : defaults[i]);
+        }
+        next[4] = 1;
+        next[5] = 1;
+        return next;
+    }
+
+    function dimensionWithinUnit(p1, p2) {
+        if (!isFinite(p1) || !isFinite(p2))
+            return false;
+
+        const epsilon = 0.0001;
+        const values = [0, 1];
+        const a = 3 * p1 - 3 * p2 + 1;
+        const b = -4 * p1 + 2 * p2;
+        const c = p1;
+
+        function addRoot(t) {
+            if (isFinite(t) && t > epsilon && t < 1 - epsilon)
+                values.push(cubicCoord(t, p1, p2));
+        }
+
+        if (Math.abs(a) < 0.000001) {
+            if (Math.abs(b) >= 0.000001)
+                addRoot(-c / b);
+        } else {
+            const discriminant = b * b - 4 * a * c;
+            if (discriminant >= -epsilon) {
+                const root = Math.sqrt(Math.max(0, discriminant));
+                addRoot((-b + root) / (2 * a));
+                addRoot((-b - root) / (2 * a));
+            }
+        }
+
+        for (let i = 0; i < values.length; i += 1) {
+            if (values[i] < -epsilon || values[i] > 1 + epsilon)
+                return false;
+        }
+        return true;
+    }
+
+    function dimensionMonotonicIncreasing(p1, p2) {
+        if (!isFinite(p1) || !isFinite(p2))
+            return false;
+
+        const epsilon = 0.0001;
+        const a = 3 * p1 - 3 * p2 + 1;
+        const b = -4 * p1 + 2 * p2;
+        const c = p1;
+        const values = [c, a + b + c];
+
+        if (Math.abs(a) >= 0.000001) {
+            const t = -b / (2 * a);
+            if (t > epsilon && t < 1 - epsilon)
+                values.push(a * t * t + b * t + c);
+        }
+
+        for (let i = 0; i < values.length; i += 1) {
+            if (values[i] < -epsilon)
+                return false;
+        }
+        return true;
+    }
+
+    function dimensionAllowed(p1, p2, requireFunction) {
+        return dimensionWithinUnit(p1, p2) && (!requireFunction || dimensionMonotonicIncreasing(p1, p2));
+    }
+
+    function curveWithinUnit(curve) {
+        const next = normalizedCurve(curve);
+        return dimensionAllowed(next[0], next[2], true) && dimensionAllowed(next[1], next[3], false);
+    }
+
+    function safeCurve(source) {
+        const next = normalizedCurve(source);
+        return curveWithinUnit(next) ? next : defaultCurve();
+    }
+
+    function setRenderCurve(nextCurve) {
+        const next = normalizedCurve(nextCurve);
+        renderX1 = next[0];
+        renderY1 = next[1];
+        renderX2 = next[2];
+        renderY2 = next[3];
+        chart.requestPaint();
+    }
+
+    function renderCurve() {
+        return [renderX1, renderY1, renderX2, renderY2, 1, 1];
     }
 
     function rawP1() {
-        return [control(0, 0.43), control(1, 1.19)];
+        return [renderX1, renderY1];
     }
 
     function rawP2() {
-        return [control(2, 1.0), control(3, 0.4)];
+        return [renderX2, renderY2];
     }
 
     function displayPoint(point) {
@@ -159,19 +262,8 @@ Item {
             + formatNumber(p2[0]) + ", " + formatNumber(p2[1]);
     }
 
-    function parseBezierText(text) {
-        const parts = text.trim().split(",");
-        if (parts.length !== 4)
-            return null;
-
-        const values = [];
-        for (let i = 0; i < 4; i += 1) {
-            const value = Number(parts[i].trim());
-            if (!isFinite(value))
-                return null;
-            values.push(value);
-        }
-        return [values[0], values[1], values[2], values[3], 1, 1];
+    function copyCoordinateList() {
+        Quickshell.execDetached(["wl-copy", coordinateListText()]);
     }
 
     function coordinateFallback(index) {
@@ -180,7 +272,9 @@ Item {
     }
 
     function coordinateValue(index) {
-        return control(index, coordinateFallback(index));
+        const values = [renderX1, renderY1, renderX2, renderY2];
+        const value = Number(values[index]);
+        return isFinite(value) ? value : coordinateFallback(index);
     }
 
     function coordinateText(index) {
@@ -212,7 +306,13 @@ Item {
         next[editingCoordinate] = value;
         next[4] = 1;
         next[5] = 1;
+        if (!curveWithinUnit(next)) {
+            coordinateInvalid = true;
+            return;
+        }
+
         workingCurve = next;
+        setRenderCurve(next);
         controlsEdited(next);
         editingCoordinate = -1;
         coordinateInvalid = false;
@@ -228,24 +328,7 @@ Item {
         if (!editable)
             return;
 
-        editText = coordinateListText();
-        editTextInvalid = false;
-        coordEditPopup.open();
-        coordPopupInput.forceActiveFocus();
-        coordPopupInput.selectAll();
-    }
-
-    function applyCoordinateEdit() {
-        const next = parseBezierText(editText);
-        if (next === null) {
-            editTextInvalid = true;
-            return;
-        }
-
-        workingCurve = next;
-        controlsEdited(next);
-        coordEditPopup.close();
-        chart.requestPaint();
+        editRequested();
     }
 
     function startPlayback() {
@@ -298,9 +381,28 @@ Item {
             1,
             1
         ];
-        workingCurve = next;
-        controlsEdited(next);
-        chart.requestPaint();
+        animateCurveTo(next, true);
+    }
+
+    function animateCurveTo(nextCurve, commit) {
+        const next = normalizedCurve(nextCurve);
+        if (!curveWithinUnit(next))
+            return;
+
+        curveAnimationCommit = false;
+        controlPointAnimation.stop();
+        animationTargetCurve = next;
+        curveAnimationCommit = !!commit;
+        curveAnimationActive = true;
+        controlPointAnimation.start();
+    }
+
+    function animationReachedTarget() {
+        const next = animationTargetCurve;
+        return Math.abs(renderX1 - next[0]) < 0.0001
+            && Math.abs(renderY1 - next[1]) < 0.0001
+            && Math.abs(renderX2 - next[2]) < 0.0001
+            && Math.abs(renderY2 - next[3]) < 0.0001;
     }
 
     function repaintChart() {
@@ -309,15 +411,25 @@ Item {
     }
 
     onCurveChanged: {
-        if (activePoint < 0)
-            workingCurve = curve;
+        if (activePoint < 0 && !curveAnimationActive) {
+            workingCurve = safeCurve(curve);
+            setRenderCurve(workingCurve);
+        }
         chart.requestPaint();
     }
-    onWorkingCurveChanged: chart.requestPaint()
+    onWorkingCurveChanged: {
+        if (!curveAnimationActive)
+            setRenderCurve(workingCurve);
+        chart.requestPaint();
+    }
     onEasingModeChanged: chart.requestPaint()
     onPlayheadChanged: chart.requestPaint()
     onWidthChanged: chart.requestPaint()
     onHeightChanged: chart.requestPaint()
+    onRenderX1Changed: repaintChart()
+    onRenderY1Changed: repaintChart()
+    onRenderX2Changed: repaintChart()
+    onRenderY2Changed: repaintChart()
     onChartSurfaceColorChanged: repaintChart()
     onChartAxisColorChanged: repaintChart()
     onChartPrimaryColorChanged: repaintChart()
@@ -334,6 +446,65 @@ Item {
             if ((root.playbackDirection > 0 && root.playhead >= 1) || (root.playbackDirection < 0 && root.playhead <= 0))
                 root.playing = false;
         }
+    }
+
+    ParallelAnimation {
+        id: controlPointAnimation
+
+        NumberAnimation {
+            target: root
+            property: "renderX1"
+            to: root.animationTargetCurve[0]
+            duration: Appearance.animation.standard.duration
+            easing.type: Appearance.animation.standard.type
+            easing.bezierCurve: Appearance.animation.standard.bezierCurve
+        }
+
+        NumberAnimation {
+            target: root
+            property: "renderY1"
+            to: root.animationTargetCurve[1]
+            duration: Appearance.animation.standard.duration
+            easing.type: Appearance.animation.standard.type
+            easing.bezierCurve: Appearance.animation.standard.bezierCurve
+        }
+
+        NumberAnimation {
+            target: root
+            property: "renderX2"
+            to: root.animationTargetCurve[2]
+            duration: Appearance.animation.standard.duration
+            easing.type: Appearance.animation.standard.type
+            easing.bezierCurve: Appearance.animation.standard.bezierCurve
+        }
+
+        NumberAnimation {
+            target: root
+            property: "renderY2"
+            to: root.animationTargetCurve[3]
+            duration: Appearance.animation.standard.duration
+            easing.type: Appearance.animation.standard.type
+            easing.bezierCurve: Appearance.animation.standard.bezierCurve
+        }
+
+        onStopped: {
+            if (!root.curveAnimationActive)
+                return;
+
+            const shouldCommit = root.curveAnimationCommit && root.animationReachedTarget();
+            root.curveAnimationActive = false;
+            root.curveAnimationCommit = false;
+            if (shouldCommit) {
+                root.workingCurve = root.animationTargetCurve;
+                root.controlsEdited(root.animationTargetCurve);
+            }
+            chart.requestPaint();
+        }
+    }
+
+    Component.onCompleted: {
+        workingCurve = safeCurve(curve);
+        setRenderCurve(workingCurve);
     }
 
     ColumnLayout {
@@ -495,6 +666,9 @@ Item {
                     }
                     next[4] = 1;
                     next[5] = 1;
+                    if (!root.curveWithinUnit(next))
+                        return;
+
                     root.workingCurve = next;
                     chart.requestPaint();
                 }
@@ -507,7 +681,7 @@ Item {
                 }
 
                 onCanceled: {
-                    root.workingCurve = root.curve;
+                    root.workingCurve = root.safeCurve(root.curve);
                     root.activePoint = -1;
                     chart.requestPaint();
                 }
@@ -621,96 +795,42 @@ Item {
                         }
                     }
                 }
-            }
-        }
-    }
 
-    Popup {
-        id: coordEditPopup
+                Item {
+                    implicitWidth: 28
+                    implicitHeight: 26
 
-        width: Math.min(360, Math.max(300, root.width - 16))
-        height: coordEditLayout.implicitHeight + 28
-        x: Math.max(0, (root.width - width) / 2)
-        y: Math.max(0, (root.height - height) / 2)
-        modal: false
-        focus: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 26
+                        height: 26
+                        radius: Appearance.rounding.extraSmall
+                        color: copyMouse.containsMouse ? Appearance.colors.colLayer2Hover : "transparent"
+                    }
 
-        background: Rectangle {
-            radius: Appearance.rounding.normal
-            color: Appearance.m3colors.m3surfaceContainerHighest
-            border.color: Appearance.applyAlpha(Appearance.colors.colOnSurfaceVariant, 0.2)
-            border.width: 1
-        }
+                    MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "content_copy"
+                        iconSize: 16
+                        color: copyMouse.containsMouse ? Appearance.colors.colOnSurface : Appearance.colors.colOnSurfaceVariant
+                    }
 
-        contentItem: ColumnLayout {
-            id: coordEditLayout
+                    MouseArea {
+                        id: copyMouse
 
-            spacing: 10
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.copyCoordinateList()
+                    }
 
-            Text {
-                Layout.fillWidth: true
-                text: "编辑贝塞尔"
-                color: Appearance.colors.colOnSurface
-                font.family: Sizes.fontFamily
-                font.pixelSize: 16
-                font.weight: Font.Medium
-            }
-
-            TextField {
-                id: coordPopupInput
-
-                Layout.fillWidth: true
-                text: root.editText
-                color: Appearance.colors.colOnSurface
-                selectedTextColor: Appearance.colors.colOnPrimary
-                selectionColor: Appearance.colors.colPrimary
-                font.family: Sizes.fontFamilyMono
-                font.pixelSize: 14
-                placeholderText: ".43,1.19,1,.4"
-                Material.accent: Appearance.colors.colPrimary
-                onTextChanged: {
-                    root.editText = text;
-                    root.editTextInvalid = false;
-                }
-                Keys.onReturnPressed: root.applyCoordinateEdit()
-                Keys.onEnterPressed: root.applyCoordinateEdit()
-
-                background: Rectangle {
-                    radius: Appearance.rounding.small
-                    color: Appearance.colors.colLayer2
-                    border.color: root.editTextInvalid ? Appearance.colors.colError : Appearance.applyAlpha(Appearance.colors.colOnSurfaceVariant, 0.32)
-                    border.width: 1
-                }
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: root.editTextInvalid ? "格式应为 4 个数字，例如 .43,1.19,1,.4" : "输入 x1,y1,x2,y2；显示时会映射到 0..1 坐标框。"
-                color: root.editTextInvalid ? Appearance.colors.colError : Appearance.colors.colOnSurfaceVariant
-                font.family: Sizes.fontFamily
-                font.pixelSize: 12
-                wrapMode: Text.WordWrap
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignRight
-                spacing: 8
-
-                Button {
-                    text: "取消"
-                    flat: true
-                    Material.foreground: Appearance.colors.colOnSurfaceVariant
-                    onClicked: coordEditPopup.close()
-                }
-
-                Button {
-                    text: "应用"
-                    Material.background: Appearance.colors.colPrimary
-                    Material.foreground: Appearance.colors.colOnPrimary
-                    onClicked: root.applyCoordinateEdit()
+                    StyledToolTip {
+                        extraVisibleCondition: copyMouse.containsMouse
+                        text: "复制"
+                    }
                 }
             }
         }
     }
+
 }

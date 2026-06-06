@@ -702,7 +702,7 @@ StyledFlickable {
                         easingMode: PersonalizationConfig.transitionEasingMode
                         playDurationMs: Math.max(200, PersonalizationConfig.transitionDurationMs)
                         onControlsEdited: nextCurve => WallpaperService.setTransitionBezierCurve(nextCurve)
-                        onEditRequested: console.log("edit custom bezier", JSON.stringify(PersonalizationConfig.transitionBezierCurve))
+                        onEditRequested: bezierCurveLayerEditor.openWithCurve(PersonalizationConfig.transitionBezierCurve)
                     }
 
                     ColumnLayout {
@@ -866,5 +866,10 @@ StyledFlickable {
     WallpaperColorPicker {
         id: wallpaperColorPicker
         onColorSelected: color => WallpaperService.setWallpaper(color)
+    }
+
+    BezierCurveLayerEditor {
+        id: bezierCurveLayerEditor
+        onCurveEdited: nextCurve => WallpaperService.setTransitionBezierCurve(nextCurve)
     }
 }

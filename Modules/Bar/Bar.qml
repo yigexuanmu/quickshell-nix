@@ -65,7 +65,7 @@ Variants {
                 height: implicitHeight
                 spacing: 8
 
-                Tray {}
+                Tray { screen: barWindow.screen }
                 SysMonitor { Layout.alignment: Qt.AlignVCenter }
                 
 

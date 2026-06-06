@@ -1,89 +1,142 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Services.SystemTray
+import Quickshell.Widgets
 import qs.Common
+import qs.Services
 import qs.Widgets.common
 
 MouseArea {
     id: root
-    required property var modelData 
-    
-    // 保持 20x20 的尺寸，完美适配 36px 高度的药丸背景
+
+    required property var modelData
+    property var screen: null
+
+    signal menuOpened(var qsWindow)
+    signal menuClosed()
+
     implicitWidth: 20
     implicitHeight: 20
-    
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
 
     function closeMenu() {
-        if (trayMenu.visible) {
-            trayMenu.visible = false
-        }
+        if (menu.active && menu.item && typeof menu.item.close === "function")
+            menu.item.close();
     }
 
     function closeOtherMenus() {
-        var siblings = root.parent.children
-        for (var i = 0; i < siblings.length; i++) {
-            var sibling = siblings[i]
-            if (sibling === root) continue
-            if (typeof sibling.closeMenu === "function") {
-                sibling.closeMenu()
-            }
+        if (!root.parent)
+            return;
+
+        const siblings = root.parent.children;
+        for (let i = 0; i < siblings.length; i += 1) {
+            const sibling = siblings[i];
+            if (sibling === root)
+                continue;
+            if (typeof sibling.closeMenu === "function")
+                sibling.closeMenu();
         }
     }
 
-    onClicked: (event) => {
+    onPressed: event => {
         if (event.button === Qt.LeftButton) {
-            modelData.activate();
-            trayMenu.visible = false;
+            root.modelData.activate();
+            root.closeMenu();
         } else if (event.button === Qt.RightButton) {
-            if (!trayMenu.visible) {
-                closeOtherMenus()
-                trayMenu.visible = true
-            } else {
-                trayMenu.visible = false
+            if (root.modelData.hasMenu || root.modelData.menu) {
+                if (menu.active && menu.item && typeof menu.item.close === "function") {
+                    menu.item.close();
+                } else {
+                    root.closeOtherMenus();
+                    menu.open();
+                }
+            }
+        }
+        event.accepted = true;
+    }
+
+    Loader {
+        id: menu
+
+        active: false
+
+        function open() {
+            menu.active = true;
+        }
+
+        sourceComponent: TrayMenu {
+            Component.onCompleted: this.open()
+
+            trayItemMenuHandle: root.modelData.menu
+            trayItemId: root.modelData.id || ""
+            anchorItem: root
+            screen: root.screen
+
+            onMenuOpened: window => root.menuOpened(window)
+            onMenuClosed: {
+                root.menuClosed();
+                menu.active = false;
             }
         }
     }
 
-    TrayMenu {
-        id: trayMenu
-        
-        rootMenuHandle: root.modelData.menu
-        trayName: root.modelData.tooltipTitle || root.modelData.id || "Menu"
-        
-        anchor.item: root
-        anchor.rect.y: (root.mapToItem(null, 0, 0).y > 500) ? -trayMenu.implicitHeight - 5 : root.height + 5
-        anchor.rect.x: 0
-    }
+    IconImage {
+        id: trayIcon
 
-    Image {
-        id: content
-        anchors.fill: parent
-        
-        source: {
-            const raw = root.modelData.icon;
-            if (raw.indexOf("spotify") !== -1) {
-                return "image://icon/spotify";
-            }
-            return raw;
-        }
-        
-        cache: true
+        visible: !TrayService.monochromeIcons
+        source: root.modelData.icon || ""
+        anchors.centerIn: parent
+        width: parent.width
+        height: parent.height
         asynchronous: true
-        fillMode: Image.PreserveAspectFit
-        
-        // 保留这两个属性：抗锯齿和平滑缩放，让原彩图标也保持边缘清晰
-        smooth: true
-        mipmap: true 
-        
-        // 微小的交互细节：平时稍微降低一点点透明度融入背景，鼠标悬浮时恢复 100% 亮度
-        opacity: root.containsMouse ? 1.0 : 0.85
-        Behavior on opacity { NumberAnimation { duration: 150 } }
+        mipmap: true
+    }
+
+    Loader {
+        active: TrayService.monochromeIcons
+        anchors.fill: trayIcon
+
+        sourceComponent: Item {
+            IconImage {
+                id: monoSource
+
+                visible: false
+                source: root.modelData.icon || ""
+                anchors.fill: parent
+                asynchronous: true
+                mipmap: true
+            }
+
+            Desaturate {
+                id: desaturatedIcon
+
+                visible: false
+                anchors.fill: parent
+                source: monoSource
+                desaturation: 0.8
+            }
+
+            ColorOverlay {
+                anchors.fill: desaturatedIcon
+                source: desaturatedIcon
+                color: Appearance.transparentize(Appearance.colors.colOnLayer0, root.containsMouse ? 0.0 : 0.1)
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: Appearance.animation.expressiveEffects.duration
+                        easing.type: Appearance.animation.expressiveEffects.type
+                        easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
+                    }
+                }
+            }
+        }
     }
 
     PopupToolTip {
         extraVisibleCondition: root.containsMouse
-        text: root.modelData.tooltipTitle || root.modelData.id || "托盘"
+        text: TrayService.getTooltipForItem(root.modelData)
     }
 }
