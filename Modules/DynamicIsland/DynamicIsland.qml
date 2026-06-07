@@ -26,7 +26,7 @@ Variants {
         screen: modelData
 
         property int topEdgeCurveWidth: 8
-        property int topEdgeCurveDepth: 28
+        property int topEdgeCurveDepth: 14
         property real topEdgeCurveSideControlY: 0.58
         property real topEdgeCurveTopControlX: 0.42
 
