@@ -605,7 +605,7 @@ StyledFlickable {
                 Layout.alignment: Qt.AlignLeft
                 spacing: 4
 
-                SegmentedButtonGroup {
+                StyledButtonGroup {
                     Layout.alignment: Qt.AlignLeft
                     model: PersonalizationConfig.matugenSchemes.slice(0, 5)
                     currentValue: PersonalizationConfig.matugenScheme
@@ -613,7 +613,7 @@ StyledFlickable {
                     onValueSelected: value => ThemeService.setMatugenScheme(value)
                 }
 
-                SegmentedButtonGroup {
+                StyledButtonGroup {
                     Layout.alignment: Qt.AlignLeft
                     model: PersonalizationConfig.matugenSchemes.slice(5, 9)
                     currentValue: PersonalizationConfig.matugenScheme
@@ -674,48 +674,6 @@ StyledFlickable {
                 value: PersonalizationConfig.iconTheme
                 placeholder: "选择图标主题"
                 onAccepted: value => ThemeService.setIconTheme(value)
-            }
-        }
-
-        Section {
-            title: "滚动交互"
-            iconName: "swipe"
-
-            ToggleSettingRow {
-                title: "平滑滚轮"
-                description: "列表与滚动容器使用统一的滚轮插值"
-                checked: PersonalizationConfig.scrollSmoothEnabled
-                onToggled: checked => PersonalizationConfig.setScrollSmoothEnabled(checked)
-            }
-
-            SliderSettingRow {
-                title: "鼠标滚轮速度"
-                description: "适用于滚轮步进输入"
-                from: 10
-                to: 240
-                stepSize: 5
-                value: PersonalizationConfig.scrollMouseFactor
-                onMoved: value => PersonalizationConfig.setScrollMouseFactor(Math.round(value))
-            }
-
-            SliderSettingRow {
-                title: "触摸板滚动速度"
-                description: "适用于连续小幅滚动输入"
-                from: 10
-                to: 300
-                stepSize: 5
-                value: PersonalizationConfig.scrollTouchpadFactor
-                onMoved: value => PersonalizationConfig.setScrollTouchpadFactor(Math.round(value))
-            }
-
-            SliderSettingRow {
-                title: "滚轮识别阈值"
-                description: "angleDelta 大于该值时按鼠标滚轮处理"
-                from: 60
-                to: 240
-                stepSize: 10
-                value: PersonalizationConfig.scrollMouseDeltaThreshold
-                onMoved: value => PersonalizationConfig.setScrollMouseDeltaThreshold(Math.round(value))
             }
         }
 
