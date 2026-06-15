@@ -80,12 +80,14 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 10
 
-                RowLayout {
-                    spacing: 0
-
-                    TabBtn { textStr: "天气情况"; tabIdx: 0; isFirst: true }
-                    TabBtn { textStr: "空气质量"; tabIdx: 1 }
-                    TabBtn { textStr: "风况"; tabIdx: 2; isLast: true }
+                StyledButtonGroup {
+                    currentValue: root.currentTab
+                    model: [
+                        ({ "value": 0, "label": "天气情况" }),
+                        ({ "value": 1, "label": "空气质量" }),
+                        ({ "value": 2, "label": "风况" })
+                    ]
+                    onValueSelected: value => root.currentTab = value
                 }
 
                 Item { Layout.fillWidth: true }
@@ -306,68 +308,6 @@ Rectangle {
                     sourceModel: root.sourceModel
                 }
             }
-        }
-    }
-
-    component TabBtn: Item {
-        property string textStr: ""
-        property int tabIdx: 0
-        property bool isFirst: false
-        property bool isLast: false
-        property bool isActive: root.currentTab === tabIdx
-
-        Layout.preferredWidth: textItem.implicitWidth + 30 + (btnMouse.pressed ? 8 : 0)
-        Layout.preferredHeight: 36
-
-        property real rLeft: (isActive || isFirst || btnMouse.pressed) ? 16 : 4
-        property real rRight: (isActive || isLast || btnMouse.pressed) ? 16 : 4
-        property color bgColor: isActive
-                                ? Appearance.colors.colPrimaryContainer
-                                : (btnMouse.containsMouse ? Appearance.colors.colLayer4 : Appearance.colors.colLayer2)
-
-        Behavior on Layout.preferredWidth { NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-        Behavior on bgColor { ColorAnimation { duration: 150 } }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.rLeft > parent.rRight ? parent.rLeft : parent.rRight
-            color: parent.bgColor
-
-            Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-        }
-
-        Rectangle {
-            anchors.left: (parent.rLeft < parent.rRight) ? parent.left : undefined
-            anchors.right: (parent.rRight < parent.rLeft) ? parent.right : undefined
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: parent.width / 2 + 5
-            visible: parent.rLeft !== parent.rRight
-            radius: parent.rLeft < parent.rRight ? parent.rLeft : parent.rRight
-            color: parent.bgColor
-
-            Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-        }
-
-        Text {
-            id: textItem
-            anchors.centerIn: parent
-            text: parent.textStr
-            font.family: "LXGW WenKai GB Screen"
-            font.pixelSize: 14
-            font.bold: parent.isActive
-            color: parent.isActive ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurfaceVariant
-            z: 2
-
-            Behavior on color { ColorAnimation { duration: 150 } }
-        }
-
-        MouseArea {
-            id: btnMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: root.currentTab = parent.tabIdx
-            z: 3
         }
     }
 

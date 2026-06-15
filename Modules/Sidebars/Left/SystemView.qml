@@ -269,80 +269,22 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 2
-                
-                component TabBtn: Item {
-                    property string textStr
-                    property int tabIdx
-                    property bool isActive: root.currentChartTab === tabIdx
-                    property bool isFirst: false
-                    property bool isLast: false
-                    
-                    // 立刻变形：按压即刻轻微扩张拉伸，缩小幅度以显优雅
-                    Layout.preferredWidth: 64 + (btnMouse.pressed ? 8 : 0)
-                    Layout.preferredHeight: 32
-                    
-                    // 交界处留有的缝隙：重新赋予它们 4px 的切角倒圆，完美匹配图片设定！按下瞬间彻底独立为 16px
-                    property real rLeft: (isActive || isFirst || btnMouse.pressed) ? 16 : 4
-                    property real rRight: (isActive || isLast || btnMouse.pressed) ? 16 : 4
-                    
-                    property color bgColor: isActive ? Appearance.colors.colPrimaryContainer : (btnMouse.containsMouse ? Appearance.colors.colLayer4 : Appearance.colors.colLayer2)
-                    
-                    // 稍微延长动画时长，找回微果冻动效的物理松弛感
-                    Behavior on Layout.preferredWidth { NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-                    Behavior on bgColor { ColorAnimation { duration: 150 } }
-                    
-                    // 双重基座降维打法：底座扛最大圆角，遮罩扛最小锐角压边。完美防漏。
-                    
-                    // 【底座大圆角】：始终取两端所需的最大弧度。由于它拥有最大的圆角侵占，必定会被拥有较小圆角的遮罩完满覆盖。
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: parent.rLeft > parent.rRight ? parent.rLeft : parent.rRight
-                        color: parent.bgColor
-                        // 稍微延长变形动画让圆润过渡清晰可见
-                        Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-                    }
-                    
-                    // 【锐角遮罩】：它只负责去修饰要求圆角较小（更尖锐）的那一边。并且半场长度足够将其自身的微小倒圆隐藏于底座的直线中！
-                    Rectangle {
-                        // 锚点锁定在要求较小倒角的那一边
-                        anchors.left: (parent.rLeft < parent.rRight) ? parent.left : undefined
-                        anchors.right: (parent.rRight < parent.rLeft) ? parent.right : undefined
-                        
-                        // 当两边倒角相同（如完美的大药丸或者同为平端），这个遮罩层自动隐身下岗
-                        visible: parent.rLeft !== parent.rRight
-                        
-                        anchors.top: parent.top; anchors.bottom: parent.bottom
-                        width: parent.width / 2 + 5 // 安全冗余 5px 以确保另一端的内倾曲线彻底藏在底座中央的平直面上
-                        
-                        radius: parent.rLeft < parent.rRight ? parent.rLeft : parent.rRight
-                        color: parent.bgColor
-                        
-                        Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-                    }
-                    
-                    Text {
-                        anchors.centerIn: parent
-                        text: parent.textStr
-                        font.family: "LXGW WenKai GB Screen"
-                        font.pixelSize: 13
-                        font.bold: parent.isActive
-                        color: parent.isActive ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurfaceVariant
-                        z: 2
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                    }
-                    
-                    MouseArea {
-                        id: btnMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: root.currentChartTab = parent.tabIdx
-                        z: 3
-                    }
+
+                StyledButtonGroup {
+                    style: StyledButtonGroup.Style.Tonal
+                    buttonHeight: 32
+                    edgeRadius: 16
+                    innerRadius: 4
+                    pressedExpansion: 8
+                    textPixelSize: 13
+                    currentValue: root.currentChartTab
+                    model: [
+                        ({ "value": 0, "label": "Net", "width": 64 }),
+                        ({ "value": 1, "label": "RAM", "width": 64 }),
+                        ({ "value": 2, "label": "Load", "width": 64 })
+                    ]
+                    onValueSelected: value => root.currentChartTab = value
                 }
-                
-                TabBtn { textStr: "Net"; tabIdx: 0; isFirst: true }
-                TabBtn { textStr: "RAM"; tabIdx: 1 }
-                TabBtn { textStr: "Load"; tabIdx: 2; isLast: true }
                 
                 Item { Layout.fillWidth: true }
             }
@@ -744,66 +686,23 @@ Item {
                     
                     RowLayout {
                         spacing: 2
-                        
-                        component ProcBtn: Item {
-                            property string textStr
-                            property int tabIdx
-                            property bool isActive: procSection.procTabIdx === tabIdx
-                            property bool isFirst: false
-                            property bool isLast: false
-                            
-                            Layout.preferredWidth: 50 + (btnMouse.pressed ? 8 : 0) + (isLast ? 24 : 0)
-                            Layout.preferredHeight: 30
-                            
-                            property real rLeft: (isActive || btnMouse.pressed) ? 15 : 8
-                            property real rRight: (isActive || btnMouse.pressed) ? 15 : 8
-                            
-                            property color bgColor: isActive ? Appearance.colors.colPrimaryContainer : (btnMouse.containsMouse ? Appearance.colors.colLayer4 : Appearance.colors.colLayer2)
-                            
-                            Behavior on Layout.preferredWidth { NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-                            Behavior on bgColor { ColorAnimation { duration: 150 } }
-                            
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: parent.rLeft > parent.rRight ? parent.rLeft : parent.rRight
-                                color: parent.bgColor
-                                Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-                            }
-                            
-                            Rectangle {
-                                anchors.left: (parent.rLeft < parent.rRight) ? parent.left : undefined
-                                anchors.right: (parent.rRight < parent.rLeft) ? parent.right : undefined
-                                visible: parent.rLeft !== parent.rRight
-                                anchors.top: parent.top; anchors.bottom: parent.bottom
-                                width: parent.width / 2 + 5 
-                                radius: parent.rLeft < parent.rRight ? parent.rLeft : parent.rRight
-                                color: parent.bgColor
-                                Behavior on radius { NumberAnimation { duration: 200; easing.type: Easing.OutSine } }
-                            }
-                            
-                            Text {
-                                anchors.centerIn: parent
-                                text: parent.textStr
-                                font.family: "LXGW WenKai GB Screen"
-                                font.pixelSize: 12
-                                font.bold: parent.isActive
-                                color: parent.isActive ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurfaceVariant
-                                z: 2
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                            }
-                            
-                            MouseArea {
-                                id: btnMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: procSection.procTabIdx = parent.tabIdx
-                                z: 3
-                            }
+
+                        StyledButtonGroup {
+                            style: StyledButtonGroup.Style.Tonal
+                            buttonHeight: 30
+                            edgeRadius: 15
+                            innerRadius: 8
+                            pressedExpansion: 8
+                            textPixelSize: 12
+                            roundOuterSegments: false
+                            currentValue: procSection.procTabIdx
+                            model: [
+                                ({ "value": 0, "label": "全部", "width": 50 }),
+                                ({ "value": 1, "label": "用户", "width": 50 }),
+                                ({ "value": 2, "label": "系统工具", "width": 74 })
+                            ]
+                            onValueSelected: value => procSection.procTabIdx = value
                         }
-                        
-                        ProcBtn { textStr: "全部"; tabIdx: 0; isFirst: true }
-                        ProcBtn { textStr: "用户"; tabIdx: 1 }
-                        ProcBtn { textStr: "系统工具"; tabIdx: 2; isLast: true }
                     }
                     
                     Item { Layout.fillWidth: true }
