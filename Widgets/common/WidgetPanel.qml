@@ -26,16 +26,6 @@ Rectangle {
             Text { text: root.title; font.bold: true; font.pixelSize: 18; color: Appearance.colors.colOnLayer2; Layout.fillWidth: true; Layout.leftMargin: 10 }
             
             RowLayout { id: headerToolsLayout; spacing: 12 }
-            
-            Item { width: 12 }
-            
-            Text {
-                text: "close"
-                font.family: "Material Symbols Outlined"; font.pixelSize: 20; color: Appearance.colors.colOnLayer1
-                MouseArea { 
-                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.closeAction()
-                }
-            }
         }
 
         ColumnLayout {
