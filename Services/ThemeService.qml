@@ -217,10 +217,6 @@ Singleton {
 
             [ "$current_theme" = "$theme_name" ] && [ "$current_size" = "$cursor_size" ] && exit 0
 
-            if [ -f "$xresources_file" ]; then
-                cp "$xresources_file" "$xresources_file.backup$(date +%s)" 2>/dev/null || true
-            fi
-
             temp_file="$xresources_file.tmp.$$"
             if [ -f "$xresources_file" ]; then
                 grep -v '^[[:space:]]*Xcursor\\.theme:' "$xresources_file" | grep -v '^[[:space:]]*Xcursor\\.size:' > "$temp_file" 2>/dev/null || true
