@@ -88,14 +88,6 @@ Button {
         implicitHeight: 30
         color: root.buttonColor
 
-        Behavior on color {
-            ColorAnimation {
-                duration: Appearance.animation.expressiveEffects.duration
-                easing.type: Appearance.animation.expressiveEffects.type
-                easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
-            }
-        }
-
         layer.enabled: true
         layer.effect: OpacityMask {
             maskSource: Rectangle {
