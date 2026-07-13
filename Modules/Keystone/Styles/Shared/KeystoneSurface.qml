@@ -8,39 +8,108 @@ import Quickshell.Wayland
 import qs.Services
 import qs.Common
 
-import qs.Modules.DynamicIsland.ClockContent
-import qs.Modules.DynamicIsland.MediaContent  
-import qs.Modules.DynamicIsland.NotificationContent
-import qs.Modules.DynamicIsland.VolumeContent
-import qs.Modules.DynamicIsland.LyricsContent 
-import qs.Modules.DynamicIsland.Hub
-import qs.Modules.DynamicIsland.Tools
-import qs.Modules.DynamicIsland.audio 
+import qs.Modules.Keystone.ClockContent
+import qs.Modules.Keystone.MediaContent  
+import qs.Modules.Keystone.NotificationContent
+import qs.Modules.Keystone.VolumeContent
+import qs.Modules.Keystone.LyricsContent 
+import qs.Modules.Keystone.Hub
+import qs.Modules.Keystone.Tools
+import qs.Modules.Keystone.audio 
 
 Variants {
+    id: styleSurface
+
+    property bool detached: false
+    property int topMargin: 0
+    property int maxPillRadius: 24
+    property bool showTopEdgeCurves: !detached
+
+    function invoke(methodName) {
+        if (instances.length === 0)
+            return "KEYSTONE_UNAVAILABLE";
+
+        const instance = instances[0];
+        if (!instance || typeof instance[methodName] !== "function")
+            return "KEYSTONE_UNAVAILABLE";
+        return instance[methodName]();
+    }
+
+    function cancelRecord(): string {
+        return invoke("cancelRecord");
+    }
+
+    function closeAllOthers(): string {
+        return invoke("closeAllOthers");
+    }
+
+    function hub(): string {
+        return invoke("hub");
+    }
+
+    function tools(): string {
+        return invoke("tools");
+    }
+
     model: Quickshell.screens
 
     PanelWindow {
-        id: islandWindow
+        id: keystoneWindow
         required property var modelData
         screen: modelData
 
-        property int topEdgeCurveWidth: 8
-        property int topEdgeCurveDepth: 14
+        property int topEdgeCurveWidth: styleSurface.showTopEdgeCurves ? 8 : 0
+        property int topEdgeCurveDepth: styleSurface.showTopEdgeCurves ? 14 : 0
         property real topEdgeCurveSideControlY: 0.58
         property real topEdgeCurveTopControlX: 0.42
 
+        function cancelRecord(): string {
+            root.isRecording = false;
+            return "RECORD_CANCELLED";
+        }
+
+        function closeAllOthers(): string {
+            root.showLyrics = false;
+            root.showTools = false;
+            root.showAudio = false;
+            root.expanded = false;
+            return "OTHERS_CLOSED";
+        }
+
+        function hub(): string {
+            if (root.showHub) {
+                root.showHub = false;
+                return "HUB_CLOSED";
+            }
+
+            closeAllOthers();
+            root.showHub = true;
+            return "HUB_OPENED";
+        }
+
+        function tools(): string {
+            if (root.showTools) {
+                root.showTools = false;
+                return "TOOLS_CLOSED";
+            }
+
+            closeAllOthers();
+            root.showHub = false;
+            root.showTools = true;
+            return "TOOLS_OPENED";
+        }
+
         anchors {
             top: true
+            bottom: true
             left: true
             right: true
         }
-        implicitHeight: Screen.height 
-        margins { top: 0 } 
+        margins { top: 0 }
         
         color: "transparent"
         exclusiveZone: -1
-        WlrLayershell.namespace: "clavis-dynamic-island"
+        WlrLayershell.namespace: "clavis-keystone"
         WlrLayershell.layer: WlrLayer.Top
 
         WlrLayershell.keyboardFocus: root.hasClosablePopup
@@ -75,10 +144,11 @@ Variants {
 
             Canvas {
                 id: shadowLeftTopCurve
+                visible: styleSurface.showTopEdgeCurves
                 anchors.right: rootShadow.left
                 anchors.top: rootShadow.top
-                width: islandWindow.topEdgeCurveWidth
-                height: islandWindow.topEdgeCurveDepth
+                width: keystoneWindow.topEdgeCurveWidth
+                height: keystoneWindow.topEdgeCurveDepth
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onPaint: {
@@ -89,8 +159,8 @@ Variants {
                     ctx.moveTo(0, 0);
                     ctx.lineTo(width, 0);
                     ctx.lineTo(width, height);
-                    ctx.bezierCurveTo(width, height * islandWindow.topEdgeCurveSideControlY,
-                                      width * islandWindow.topEdgeCurveTopControlX, 0,
+                    ctx.bezierCurveTo(width, height * keystoneWindow.topEdgeCurveSideControlY,
+                                      width * keystoneWindow.topEdgeCurveTopControlX, 0,
                                       0, 0);
                     ctx.fill();
                 }
@@ -106,8 +176,8 @@ Variants {
                 Rectangle {
                     id: solidShadowBg
                     anchors.fill: parent
-                    topLeftRadius: 0
-                    topRightRadius: 0
+                    topLeftRadius: styleSurface.detached ? root.radius : 0
+                    topRightRadius: styleSurface.detached ? root.radius : 0
                     bottomLeftRadius: root.radius
                     bottomRightRadius: root.radius
                     color: "black"
@@ -141,10 +211,11 @@ Variants {
 
             Canvas {
                 id: shadowRightTopCurve
+                visible: styleSurface.showTopEdgeCurves
                 anchors.left: rootShadow.right
                 anchors.top: rootShadow.top
-                width: islandWindow.topEdgeCurveWidth
-                height: islandWindow.topEdgeCurveDepth
+                width: keystoneWindow.topEdgeCurveWidth
+                height: keystoneWindow.topEdgeCurveDepth
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onPaint: {
@@ -155,8 +226,8 @@ Variants {
                     ctx.moveTo(width, 0);
                     ctx.lineTo(0, 0);
                     ctx.lineTo(0, height);
-                    ctx.bezierCurveTo(0, height * islandWindow.topEdgeCurveSideControlY,
-                                      width * (1 - islandWindow.topEdgeCurveTopControlX), 0,
+                    ctx.bezierCurveTo(0, height * keystoneWindow.topEdgeCurveSideControlY,
+                                      width * (1 - keystoneWindow.topEdgeCurveTopControlX), 0,
                                       width, 0);
                     ctx.fill();
                 }
@@ -175,21 +246,23 @@ Variants {
         }
 
         // ============================================================
-        // 【视觉灵动岛本体】 
+        // 【视觉 Keystone bangs 本体】 
         // ============================================================
         Item {
             id: maskContainer
             anchors.top: parent.top
+            anchors.topMargin: styleSurface.topMargin
             anchors.horizontalCenter: parent.horizontalCenter
-            width: root.width + (islandWindow.topEdgeCurveWidth * 2)
+            width: root.width + (keystoneWindow.topEdgeCurveWidth * 2)
             height: root.height
 
             Canvas {
                 id: leftTopCurve
+                visible: styleSurface.showTopEdgeCurves
                 anchors.right: root.left
                 anchors.top: root.top
-                width: islandWindow.topEdgeCurveWidth
-                height: islandWindow.topEdgeCurveDepth
+                width: keystoneWindow.topEdgeCurveWidth
+                height: keystoneWindow.topEdgeCurveDepth
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onPaint: {
@@ -200,8 +273,8 @@ Variants {
                     ctx.moveTo(0, 0);
                     ctx.lineTo(width, 0);
                     ctx.lineTo(width, height);
-                    ctx.bezierCurveTo(width, height * islandWindow.topEdgeCurveSideControlY,
-                                      width * islandWindow.topEdgeCurveTopControlX, 0,
+                    ctx.bezierCurveTo(width, height * keystoneWindow.topEdgeCurveSideControlY,
+                                      width * keystoneWindow.topEdgeCurveTopControlX, 0,
                                       0, 0);
                     ctx.fill();
                 }
@@ -234,7 +307,7 @@ Variants {
                 property bool isVolumeMode: showVolume && !expanded && !isAudioMode && !isHubMode && !isToolsMode && !isLyricsMode
                 property bool isNotifMode: NotificationManager.hasNotifs && !expanded && !showVolume && !isAudioMode && !isHubMode && !isToolsMode && !isLyricsMode
                 property bool isCollapsedMode: !expanded && !isNotifMode && !isVolumeMode && !isAudioMode && !isLyricsMode && !isHubMode && !isToolsMode
-                property bool isCollapsedHovered: isCollapsedMode && (islandMouseArea.containsMouse || collapsedInputArea.containsMouse)
+                property bool isCollapsedHovered: isCollapsedMode && (keystoneMouseArea.containsMouse || collapsedInputArea.containsMouse)
                 property bool hasClosablePopup: expanded || showLyrics || showHub || showTools || showAudio
                 
                 property bool showOverviewHole: isHubMode && hubTabIndex === 0
@@ -252,7 +325,9 @@ Variants {
                 clip: true
                 z: 100
 
-                property int targetR: 12
+                property int targetR: styleSurface.detached
+                    ? Math.min(targetH / 2, styleSurface.maxPillRadius)
+                    : 12
 
                 property int targetW: isAudioMode ? audioW :
                     isToolsMode ? toolsW :
@@ -272,12 +347,12 @@ Variants {
                         isNotifMode ? notifH : 
                         (collapsedH + (isCollapsedHovered ? 6 : 0))
 
-                property int wDuration: DynamicIslandMotion.expandingDuration
-                property int hDuration: DynamicIslandMotion.expandingDuration
-                property int rDuration: DynamicIslandMotion.radiusDuration
-                property var wBezier: DynamicIslandMotion.expandingBezier
-                property var hBezier: DynamicIslandMotion.expandingBezier
-                property var rBezier: DynamicIslandMotion.radiusBezier
+                property int wDuration: KeystoneMotion.expandingDuration
+                property int hDuration: KeystoneMotion.expandingDuration
+                property int rDuration: KeystoneMotion.radiusDuration
+                property var wBezier: KeystoneMotion.expandingBezier
+                property var hBezier: KeystoneMotion.expandingBezier
+                property var rBezier: KeystoneMotion.radiusBezier
 
                 width: targetW
                 height: targetH
@@ -286,8 +361,8 @@ Variants {
                 Rectangle {
                     id: solidRootBg
                     anchors.fill: parent
-                    topLeftRadius: 0
-                    topRightRadius: 0
+                    topLeftRadius: styleSurface.detached ? parent.radius : 0
+                    topRightRadius: styleSurface.detached ? parent.radius : 0
                     bottomLeftRadius: parent.radius
                     bottomRightRadius: parent.radius
                     color: Appearance.colors.colLayer0
@@ -320,66 +395,66 @@ Variants {
 
                 onTargetWChanged: {
                     if (root.isHoverWidthMotion(targetW)) {
-                        wDuration = DynamicIslandMotion.hoverDuration;
-                        wBezier = DynamicIslandMotion.hoverBezier;
+                        wDuration = KeystoneMotion.hoverDuration;
+                        wBezier = KeystoneMotion.hoverBezier;
                         return;
                     }
 
                     const isExpanding = targetW > width;
-                    wDuration = isExpanding ? DynamicIslandMotion.expandingDuration : DynamicIslandMotion.shrinkingDuration;
-                    wBezier = isExpanding ? DynamicIslandMotion.expandingBezier : DynamicIslandMotion.shrinkingBezier;
+                    wDuration = isExpanding ? KeystoneMotion.expandingDuration : KeystoneMotion.shrinkingDuration;
+                    wBezier = isExpanding ? KeystoneMotion.expandingBezier : KeystoneMotion.shrinkingBezier;
                 }
                 onTargetHChanged: {
                     if (root.isHoverHeightMotion(targetH)) {
-                        hDuration = DynamicIslandMotion.hoverDuration;
-                        hBezier = DynamicIslandMotion.hoverBezier;
+                        hDuration = KeystoneMotion.hoverDuration;
+                        hBezier = KeystoneMotion.hoverBezier;
                         return;
                     }
 
                     const isExpanding = targetH > height;
-                    hDuration = isExpanding ? DynamicIslandMotion.expandingDuration : DynamicIslandMotion.shrinkingDuration;
-                    hBezier = isExpanding ? DynamicIslandMotion.expandingBezier : DynamicIslandMotion.shrinkingBezier;
+                    hDuration = isExpanding ? KeystoneMotion.expandingDuration : KeystoneMotion.shrinkingDuration;
+                    hBezier = isExpanding ? KeystoneMotion.expandingBezier : KeystoneMotion.shrinkingBezier;
                 }
                 onTargetRChanged: {
                     if (root.isHoverRadiusMotion(targetR)) {
-                        rDuration = DynamicIslandMotion.hoverDuration;
-                        rBezier = DynamicIslandMotion.hoverBezier;
+                        rDuration = KeystoneMotion.hoverDuration;
+                        rBezier = KeystoneMotion.hoverBezier;
                     } else {
-                        rDuration = DynamicIslandMotion.radiusDuration;
-                        rBezier = DynamicIslandMotion.radiusBezier;
+                        rDuration = KeystoneMotion.radiusDuration;
+                        rBezier = KeystoneMotion.radiusBezier;
                     }
                 }
 
                 function isHoverWidthMotion(nextW) {
-                    return isCollapsedMode && Math.abs(nextW - width) <= DynamicIslandMotion.hoverWidthDelta;
+                    return isCollapsedMode && Math.abs(nextW - width) <= KeystoneMotion.hoverWidthDelta;
                 }
 
                 function isHoverHeightMotion(nextH) {
-                    return isCollapsedMode && Math.abs(nextH - height) <= DynamicIslandMotion.hoverHeightDelta;
+                    return isCollapsedMode && Math.abs(nextH - height) <= KeystoneMotion.hoverHeightDelta;
                 }
 
                 function isHoverRadiusMotion(nextR) {
-                    return isCollapsedMode && Math.abs(nextR - radius) <= DynamicIslandMotion.hoverRadiusDelta;
+                    return isCollapsedMode && Math.abs(nextR - radius) <= KeystoneMotion.hoverRadiusDelta;
                 }
 
                 Behavior on width {
                     NumberAnimation {
                         duration: root.wDuration
-                        easing.type: DynamicIslandMotion.type
+                        easing.type: KeystoneMotion.type
                         easing.bezierCurve: root.wBezier
                     }
                 }
                 Behavior on height {
                     NumberAnimation {
                         duration: root.hDuration
-                        easing.type: DynamicIslandMotion.type
+                        easing.type: KeystoneMotion.type
                         easing.bezierCurve: root.hBezier
                     }
                 }
                 Behavior on radius {
                     NumberAnimation {
                         duration: root.rDuration
-                        easing.type: DynamicIslandMotion.type
+                        easing.type: KeystoneMotion.type
                         easing.bezierCurve: root.rBezier
                     }
                 }
@@ -392,41 +467,17 @@ Variants {
                 }
 
                 Keys.onEscapePressed: (event) => {
-                    root.closeIslandPopups();
+                    root.closeKeystonePopups();
                     event.accepted = true;
                 }
 
-                function closeIslandPopups() {
+                function closeKeystonePopups() {
                     root.expanded = false;
                     root.showLyrics = false;
                     root.showVolume = false;
                     root.showHub = false;
                     root.showTools = false;
                     root.showAudio = false;
-                }
-
-                IpcHandler {
-                    target: "island"
-                    
-                    function cancelRecord() {
-                        root.isRecording = false; return "RECORD_CANCELLED"
-                    }
-
-                    function closeAllOthers() {
-                        root.showLyrics = false; root.showTools = false;
-                        root.showAudio = false; 
-                        root.expanded = false;
-                    }
-
-                    function hub() {
-                        if (root.showHub) { root.showHub = false; return "HUB_CLOSED" } 
-                        else { closeAllOthers(); root.showHub = true; return "HUB_OPENED" }
-                    }
-
-                    function tools() {
-                        if (root.showTools) { root.showTools = false; return "TOOLS_CLOSED" } 
-                        else { closeAllOthers(); root.showHub = false; root.showTools = true; return "TOOLS_OPENED" }
-                    }
                 }
 
                 PwObjectTracker { objects: [ Pipewire.defaultAudioSink, Pipewire.defaultAudioSource ] }
@@ -500,7 +551,7 @@ Variants {
                 }
 
                 MouseArea {
-                    id: islandMouseArea  
+                    id: keystoneMouseArea  
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true   
                     enabled: !root.isNotifMode && !root.isVolumeMode 
@@ -626,7 +677,7 @@ Variants {
                         visible: opacity > 0.01
                         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-                        onRequestHideIsland: { root.showTools = false }
+                        onRequestHideKeystone: { root.showTools = false }
                         onRequestSetRecording: (state) => { root.isRecording = state }
                         onRequestShowAudio: (mode) => { 
                             root.currentAudioMode = mode
@@ -680,10 +731,11 @@ Variants {
 
             Canvas {
                 id: rightTopCurve
+                visible: styleSurface.showTopEdgeCurves
                 anchors.left: root.right
                 anchors.top: root.top
-                width: islandWindow.topEdgeCurveWidth
-                height: islandWindow.topEdgeCurveDepth
+                width: keystoneWindow.topEdgeCurveWidth
+                height: keystoneWindow.topEdgeCurveDepth
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onPaint: {
@@ -694,8 +746,8 @@ Variants {
                     ctx.moveTo(width, 0);
                     ctx.lineTo(0, 0);
                     ctx.lineTo(0, height);
-                    ctx.bezierCurveTo(0, height * islandWindow.topEdgeCurveSideControlY,
-                                      width * (1 - islandWindow.topEdgeCurveTopControlX), 0,
+                    ctx.bezierCurveTo(0, height * keystoneWindow.topEdgeCurveSideControlY,
+                                      width * (1 - keystoneWindow.topEdgeCurveTopControlX), 0,
                                       width, 0);
                     ctx.fill();
                 }
@@ -717,9 +769,9 @@ Variants {
 
             Behavior on anchors.rightMargin {
                 NumberAnimation {
-                    duration: DynamicIslandMotion.recordIndicatorDuration
-                    easing.type: DynamicIslandMotion.type
-                    easing.bezierCurve: DynamicIslandMotion.recordIndicatorBezier
+                    duration: KeystoneMotion.recordIndicatorDuration
+                    easing.type: KeystoneMotion.type
+                    easing.bezierCurve: KeystoneMotion.recordIndicatorBezier
                 }
             }
             

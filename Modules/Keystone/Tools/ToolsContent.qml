@@ -17,8 +17,8 @@ Item {
     }
 
     // 预留给外部监听的关闭信号
-    signal requestHideIsland()
-    // 向 DynamicIsland 发送录制状态变更信号
+    signal requestHideKeystone()
+    // 向 Keystone 发送录制状态变更信号
     signal requestSetRecording(bool state)
     signal requestShowAudio(string mode)
 
@@ -57,7 +57,7 @@ Item {
     function triggerSelected() {
         console.log("触发工具: " + toolsModel[selectedIndex].tip)
         
-        toolsRoot.requestHideIsland()
+        toolsRoot.requestHideKeystone()
         
         if (selectedIndex === 0) {
             toolsBackend.pickColor()

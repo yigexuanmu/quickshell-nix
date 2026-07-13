@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Modules.Bar
-import qs.Modules.DynamicIsland
+import qs.Modules.Keystone
 import qs.Modules.Launcher
 import qs.Modules.Lock
 import qs.Modules.Sidebars.Left
@@ -19,7 +19,7 @@ Item {
 
     Bar {}
 
-    DynamicIsland {}
+    Keystone {}
 
     LeftSidebarWindow {}
 
@@ -50,7 +50,7 @@ Item {
     IpcHandler {
         target: "launcher"
 
-        function toggle() {
+        function toggle(): string {
             rofiLauncher.toggleWindow();
             return "LAUNCHER_TOGGLED";
         }

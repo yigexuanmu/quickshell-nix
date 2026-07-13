@@ -3,10 +3,10 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import qs.Common
 
-import qs.Modules.DynamicIsland.OverviewContent
-import qs.Modules.DynamicIsland.Media
-import qs.Modules.DynamicIsland.WallpaperContent
-import qs.Modules.DynamicIsland.WeatherContent
+import qs.Modules.Keystone.OverviewContent
+import qs.Modules.Keystone.Media
+import qs.Modules.Keystone.WallpaperContent
+import qs.Modules.Keystone.WeatherContent
 
 Item {
     id: root

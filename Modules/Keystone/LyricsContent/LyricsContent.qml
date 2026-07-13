@@ -22,7 +22,7 @@ Item {
     readonly property string artUrl: player ? (player.trackArtUrl || "") : ""
     
     property string currentLoadedTitle: ""
-    readonly property string spectrumToken: "dynamic-island-lyrics"
+    readonly property string spectrumToken: "keystone-lyrics"
 
     Component.onCompleted: {
         if (root.active)

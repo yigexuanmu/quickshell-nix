@@ -27,7 +27,7 @@ Item {
     property bool showLyrics: false 
 
     property bool _isReady: false
-    readonly property string spectrumToken: "dynamic-island-media"
+    readonly property string spectrumToken: "keystone-media"
     Component.onCompleted: {
         _isReady = true;
         if (root.isActive)

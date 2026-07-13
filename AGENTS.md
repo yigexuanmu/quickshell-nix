@@ -2,7 +2,7 @@
 
 ## 项目结构与模块组织
 
-这是一个主要使用 QML 构建的 Quickshell 桌面 shell。`shell.qml` 是主入口，只负责加载 `AppShell.qml`；`AppShell.qml` 负责挂载 Bar、DynamicIsland、Sidebars、Launcher 与 Lock 等顶层模块。`demo.qml`、`test_list.qml` 和 `test_proc.qml` 是本地 smoke-test 入口。
+这是一个主要使用 QML 构建的 Quickshell 桌面 shell。`shell.qml` 是主入口，只负责加载 `AppShell.qml`；`AppShell.qml` 负责挂载 Bar、Keystone、Sidebars、Launcher 与 Lock 等顶层模块。`demo.qml`、`test_list.qml` 和 `test_proc.qml` 是本地 smoke-test 入口。
 
 当前目录结构约定如下：
 
@@ -23,7 +23,10 @@
 ├── Services/                 # 数据逻辑与系统状态单例
 ├── Modules/                  # 业务功能模块
 │   ├── Bar/
-│   ├── DynamicIsland/
+│   ├── Keystone/
+│   │   └── Styles/
+│   │       ├── Bangs/
+│   │       └── Pill/
 │   ├── Launcher/
 │   ├── Lock/
 │   └── Sidebars/
@@ -47,7 +50,7 @@
 
 分层规则：
 
-- `Modules/` 是业务层，存放大型、独立的功能区块；侧边栏、灵动岛、启动器、锁屏等都归入这里。
+- `Modules/` 是业务层，存放大型、独立的功能区块；侧边栏、Keystone、启动器、锁屏等都归入这里。
 - `Widgets/` 是展示层，只放可复用 UI 控件和小型面板外壳；不要在这里直接使用 `Process`、`Quickshell.execDetached` 或其他系统命令调用。
 - `Common/` 是全局基础设施；主题色、尺寸 token、共享状态、路径和纯工具函数都放这里。QML 中引用静态资源或脚本时优先通过 `Common/Paths.qml`。
 - `Services/` 是数据逻辑层，保持单例模式；UI 需要系统状态或系统操作时优先通过 `Services/` 暴露的属性/函数访问。
