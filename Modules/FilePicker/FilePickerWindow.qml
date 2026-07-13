@@ -316,6 +316,7 @@ ApplicationWindow {
 
         Rectangle {
             anchors.fill: parent
+            z: -2
             radius: Appearance.rounding.veryLarge
             color: Appearance.m3colors.m3surface
         }
@@ -324,8 +325,29 @@ ApplicationWindow {
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
             z: -1
-            onPressed: event => event.accepted = true
+            onPressed: event => {
+                if (event.button === Qt.LeftButton && root.pathEditing)
+                    root.cancelPathEditing();
+                event.accepted = true;
+            }
             onClicked: event => event.accepted = true
+        }
+
+        TapHandler {
+            acceptedButtons: Qt.LeftButton
+            onTapped: eventPoint => {
+                if (!root.pathEditing)
+                    return;
+
+                const topLeft = pathEditor.mapToItem(dialogFocus, 0, 0);
+                const position = eventPoint.position;
+                const insideEditor = position.x >= topLeft.x
+                    && position.x <= topLeft.x + pathEditor.width
+                    && position.y >= topLeft.y
+                    && position.y <= topLeft.y + pathEditor.height;
+                if (!insideEditor)
+                    root.cancelPathEditing();
+            }
         }
 
         ColumnLayout {
@@ -674,7 +696,7 @@ ApplicationWindow {
                                 rotation: appeared ? 0 : ((index % 3) - 1) * 3
                                 toggled: selected
                                 buttonRadius: Appearance.rounding.large
-                                colBackground: "transparent"
+                                colBackground: Appearance.transparentize(Appearance.colors.colSecondaryContainer, 1)
                                 colBackgroundHover: Appearance.colors.colLayer3Hover
                                 colBackgroundToggled: Appearance.colors.colSecondaryContainer
                                 colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
@@ -888,7 +910,7 @@ ApplicationWindow {
         padding: 0
         toggled: current
         buttonRadius: Appearance.rounding.small
-        colBackground: "transparent"
+        colBackground: Appearance.transparentize(Appearance.colors.colLayer3, 1)
         colBackgroundHover: Appearance.colors.colLayer3Hover
         colBackgroundToggled: Appearance.colors.colLayer3
         colBackgroundToggledHover: Appearance.colors.colLayer3Hover
@@ -942,7 +964,7 @@ ApplicationWindow {
         padding: 0
         toggled: active
         buttonRadius: Appearance.rounding.full
-        colBackground: "transparent"
+        colBackground: Appearance.transparentize(Appearance.colors.colSecondaryContainer, 1)
         colBackgroundHover: Appearance.colors.colLayer3Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
         colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
@@ -978,7 +1000,7 @@ ApplicationWindow {
         padding: 0
         toggled: active
         buttonRadius: Appearance.rounding.full
-        colBackground: "transparent"
+        colBackground: Appearance.transparentize(Appearance.colors.colSecondaryContainer, 1)
         colBackgroundHover: Appearance.colors.colLayer2Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
         colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover

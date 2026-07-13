@@ -29,9 +29,12 @@ Button {
     property color colRippleToggled: Appearance.colors.colPrimaryActive
 
     readonly property bool pointerHovered: pointerArea.containsMouse
+    readonly property color restingBackground: root.colBackground.a <= 0
+        ? Appearance.transparentize(root.colBackgroundHover, 1)
+        : root.colBackground
     readonly property color buttonColor: Appearance.transparentize(root.toggled
         ? (root.pointerHovered ? root.colBackgroundToggledHover : root.colBackgroundToggled)
-        : (root.pointerHovered ? root.colBackgroundHover : root.colBackground),
+        : (root.pointerHovered ? root.colBackgroundHover : root.restingBackground),
         root.enabled ? 0 : 1)
     readonly property color rippleColor: root.toggled ? root.colRippleToggled : root.colRipple
 
@@ -53,6 +56,7 @@ Button {
         ));
 
         rippleFadeAnim.complete();
+        ripple.activeColor = root.rippleColor;
         rippleAnim.restart();
     }
 
@@ -91,6 +95,7 @@ Button {
 
             property real implicitWidth: 0
             property real implicitHeight: 0
+            property color activeColor: root.rippleColor
 
             width: implicitWidth
             height: implicitHeight
@@ -108,9 +113,9 @@ Button {
             RadialGradient {
                 anchors.fill: parent
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: root.rippleColor }
-                    GradientStop { position: 0.3; color: root.rippleColor }
-                    GradientStop { position: 0.5; color: Appearance.applyAlpha(root.rippleColor, 0) }
+                    GradientStop { position: 0.0; color: ripple.activeColor }
+                    GradientStop { position: 0.3; color: ripple.activeColor }
+                    GradientStop { position: 0.5; color: Appearance.applyAlpha(ripple.activeColor, 0) }
                 }
             }
 
