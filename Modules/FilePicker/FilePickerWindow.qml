@@ -23,13 +23,17 @@ ApplicationWindow {
     property string selectedName: ""
     property bool selectedIsDir: false
     property bool showHiddenFiles: false
+    property bool pathEditing: false
+    property string pathDraft: ""
 
     readonly property string homeDir: StandardPaths.writableLocation(StandardPaths.HomeLocation)
     readonly property string desktopDir: StandardPaths.writableLocation(StandardPaths.DesktopLocation)
     readonly property string documentsDir: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
     readonly property string picturesDir: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
     readonly property string downloadsDir: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
+    readonly property bool hasSelection: selectedPath !== ""
     readonly property bool selectionValid: selectedPath !== "" && !selectedIsDir
+    readonly property var breadcrumbItems: buildBreadcrumbItems(currentPath)
 
     signal accepted(string path)
     signal rejected()
@@ -61,6 +65,75 @@ ApplicationWindow {
         return "file://" + path.split("/").map(segment => encodeURIComponent(segment)).join("/");
     }
 
+    function normalizePath(path) {
+        let value = String(path || "").trim();
+        if (value === "~")
+            value = homeDir;
+        else if (value.startsWith("~/"))
+            value = homeDir + value.substring(1);
+        if (!value.startsWith("/"))
+            return "";
+
+        const normalizedParts = [];
+        for (const part of value.split("/")) {
+            if (part === "" || part === ".")
+                continue;
+            if (part === "..") {
+                normalizedParts.pop();
+                continue;
+            }
+            normalizedParts.push(part);
+        }
+        return normalizedParts.length === 0 ? "/" : "/" + normalizedParts.join("/");
+    }
+
+    function buildBreadcrumbItems(path) {
+        const normalized = normalizePath(path) || "/";
+        const normalizedHome = normalizePath(homeDir);
+        const insideHome = normalized === normalizedHome || normalized.startsWith(normalizedHome + "/");
+        const items = [];
+        let cursor = insideHome ? normalizedHome : "";
+        let remainder = normalized;
+
+        if (insideHome) {
+            items.push({ label: "主文件夹", path: normalizedHome, iconName: "home" });
+            remainder = normalized.substring(normalizedHome.length);
+        } else {
+            items.push({ label: "文件系统", path: "/", iconName: "hard_drive" });
+        }
+
+        for (const part of remainder.split("/").filter(component => component !== "")) {
+            cursor = cursor === "" ? "/" + part : cursor + "/" + part;
+            items.push({ label: part, path: cursor, iconName: "" });
+        }
+        return items;
+    }
+
+    function beginPathEditing() {
+        pathDraft = currentPath;
+        pathEditing = true;
+        Qt.callLater(() => {
+            pathEditor.forceActiveFocus();
+            pathEditor.selectAll();
+        });
+    }
+
+    function cancelPathEditing() {
+        if (!pathEditing)
+            return;
+        pathEditing = false;
+        pathDraft = currentPath;
+        Qt.callLater(() => fileGrid.forceActiveFocus());
+    }
+
+    function commitPathEditing() {
+        const normalized = normalizePath(pathDraft);
+        if (normalized !== "")
+            navigateTo(normalized);
+        else
+            cancelPathEditing();
+    }
+
     function qtScreenFor(shellScreen) {
         if (!shellScreen)
             return null;
@@ -73,7 +146,9 @@ ApplicationWindow {
     }
 
     function openAt(path) {
-        currentPath = path && path !== "" ? path : picturesDir;
+        currentPath = normalizePath(path && path !== "" ? path : picturesDir) || picturesDir;
+        pathEditing = false;
+        pathDraft = currentPath;
         clearSelection();
         const mappedScreen = qtScreenFor(targetScreen);
         if (mappedScreen)
@@ -91,6 +166,7 @@ ApplicationWindow {
         if (!visible)
             return;
         visible = false;
+        pathEditing = false;
         clearSelection();
         rejected();
     }
@@ -111,9 +187,12 @@ ApplicationWindow {
     }
 
     function navigateTo(path) {
-        if (!path || path === "")
+        const normalized = normalizePath(path);
+        if (normalized === "")
             return;
-        currentPath = path;
+        currentPath = normalized;
+        pathDraft = normalized;
+        pathEditing = false;
         clearSelection();
     }
 
@@ -173,19 +252,32 @@ ApplicationWindow {
         }
 
         Keys.onEscapePressed: event => {
-            root.dismiss();
+            if (root.pathEditing)
+                root.cancelPathEditing();
+            else
+                root.dismiss();
             event.accepted = true;
         }
         Keys.onReturnPressed: event => {
-            root.acceptSelection();
-            event.accepted = root.selectionValid;
+            if (root.pathEditing) {
+                root.commitPathEditing();
+                event.accepted = true;
+            } else {
+                root.acceptSelection();
+                event.accepted = root.selectionValid;
+            }
         }
         Keys.onEnterPressed: event => {
-            root.acceptSelection();
-            event.accepted = root.selectionValid;
+            if (root.pathEditing) {
+                root.commitPathEditing();
+                event.accepted = true;
+            } else {
+                root.acceptSelection();
+                event.accepted = root.selectionValid;
+            }
         }
         Keys.onPressed: event => {
-            if (event.key === Qt.Key_Backspace) {
+            if (!root.pathEditing && event.key === Qt.Key_Backspace) {
                 root.navigateUp();
                 event.accepted = true;
             }
@@ -361,21 +453,133 @@ ApplicationWindow {
                             }
 
                             Rectangle {
+                                id: pathBar
+
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 radius: Appearance.rounding.full
                                 color: Appearance.colors.colSurfaceContainerHighest
+                                clip: true
 
-                                Text {
+                                Item {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 14
-                                    anchors.rightMargin: 14
-                                    text: root.currentPath
+                                    visible: !root.pathEditing
+
+                                    Flickable {
+                                        id: breadcrumbFlick
+
+                                        function revealCurrent() {
+                                            contentX = Math.max(0, contentWidth - width);
+                                        }
+
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 4
+                                        anchors.rightMargin: 4
+                                        contentWidth: breadcrumbRow.implicitWidth
+                                        contentHeight: height
+                                        boundsBehavior: Flickable.StopAtBounds
+                                        flickableDirection: Flickable.HorizontalFlick
+                                        interactive: contentWidth > width
+                                        clip: true
+
+                                        onContentWidthChanged: Qt.callLater(revealCurrent)
+                                        onWidthChanged: Qt.callLater(revealCurrent)
+
+                                        Row {
+                                            id: breadcrumbRow
+
+                                            height: breadcrumbFlick.height
+                                            spacing: 2
+
+                                            Repeater {
+                                                model: root.breadcrumbItems
+
+                                                delegate: Row {
+                                                    id: breadcrumbEntry
+
+                                                    required property int index
+                                                    required property var modelData
+                                                    readonly property bool current: index === root.breadcrumbItems.length - 1
+
+                                                    height: breadcrumbRow.height
+                                                    spacing: 2
+
+                                                    Text {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        visible: breadcrumbEntry.index > 0
+                                                        text: "/"
+                                                        color: Appearance.colors.colOnSurfaceVariant
+                                                        font.family: Sizes.fontFamilyMono
+                                                        font.pixelSize: 13
+                                                    }
+
+                                                    BreadcrumbButton {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        label: breadcrumbEntry.modelData.label
+                                                        path: breadcrumbEntry.modelData.path
+                                                        iconName: breadcrumbEntry.modelData.iconName
+                                                        current: breadcrumbEntry.current
+                                                    }
+                                                }
+                                            }
+
+                                            Item {
+                                                width: Math.max(18, breadcrumbFlick.width - x)
+                                                height: breadcrumbRow.height
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.IBeamCursor
+                                                    onClicked: root.beginPathEditing()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                TextField {
+                                    id: pathEditor
+
+                                    anchors.fill: parent
+                                    visible: root.pathEditing
+                                    text: root.pathDraft
+                                    leftPadding: 14
+                                    rightPadding: 14
+                                    topPadding: 0
+                                    bottomPadding: 0
+                                    selectByMouse: true
+                                    selectedTextColor: Appearance.colors.colOnSecondaryContainer
+                                    selectionColor: Appearance.colors.colSecondaryContainer
                                     color: Appearance.colors.colOnSurface
+                                    verticalAlignment: TextInput.AlignVCenter
                                     font.family: Sizes.fontFamilyMono
                                     font.pixelSize: 12
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideMiddle
+
+                                    background: Rectangle {
+                                        radius: Appearance.rounding.full
+                                        color: pathEditor.activeFocus
+                                            ? Appearance.colors.colPrimary
+                                            : Appearance.colors.colSurfaceContainerHighest
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: pathEditor.activeFocus ? 2 : 0
+                                            radius: Appearance.rounding.full
+                                            color: Appearance.colors.colSurfaceContainerHighest
+                                        }
+                                    }
+
+                                    onTextEdited: root.pathDraft = text
+                                    onAccepted: root.commitPathEditing()
+                                    onActiveFocusChanged: {
+                                        if (!activeFocus && root.pathEditing)
+                                            root.cancelPathEditing();
+                                    }
+
+                                    Keys.onEscapePressed: event => {
+                                        root.cancelPathEditing();
+                                        event.accepted = true;
+                                    }
                                 }
                             }
 
@@ -451,8 +655,8 @@ ApplicationWindow {
                                 colBackgroundHover: Appearance.colors.colLayer3Hover
                                 colBackgroundToggled: Appearance.colors.colSecondaryContainer
                                 colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
-                                colRipple: Appearance.colors.colLayer3Active
-                                colRippleToggled: Appearance.colors.colSecondaryContainerActive
+                                colRipple: Appearance.colors.colOnSurface
+                                colRippleToggled: Appearance.colors.colOnSecondaryContainer
                                 releaseAction: () => root.selectEntry(filePath, fileName, fileIsDir)
                                 doubleClickAction: () => root.openEntry(filePath, fileIsDir)
                                 transform: Translate {
@@ -630,18 +834,75 @@ ApplicationWindow {
                             PickerActionButton {
                                 label: "取消"
                                 iconName: "close"
-                                onClicked: root.dismiss()
+                                enabled: root.hasSelection
+                                onClicked: root.clearSelection()
                             }
 
                             PickerActionButton {
                                 label: "选择"
                                 iconName: "check"
-                                primary: true
+                                primary: root.selectionValid
                                 enabled: root.selectionValid
                                 onClicked: root.acceptSelection()
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    component BreadcrumbButton: MaterialRippleButton {
+        id: breadcrumbButton
+
+        required property string label
+        required property string path
+        property string iconName: ""
+        property bool current: false
+
+        implicitWidth: breadcrumbContent.implicitWidth + 22
+        implicitHeight: 36
+        padding: 0
+        toggled: current
+        buttonRadius: Appearance.rounding.small
+        buttonRadiusPressed: Appearance.rounding.extraSmall
+        colBackground: "transparent"
+        colBackgroundHover: Appearance.colors.colLayer3Hover
+        colBackgroundToggled: Appearance.colors.colLayer3
+        colBackgroundToggledHover: Appearance.colors.colLayer3Hover
+        colRipple: Appearance.colors.colOnSurface
+        colRippleToggled: Appearance.colors.colOnSurface
+        onClicked: {
+            if (breadcrumbButton.current)
+                root.beginPathEditing();
+            else
+                root.navigateTo(breadcrumbButton.path);
+        }
+
+        contentItem: Item {
+            RowLayout {
+                id: breadcrumbContent
+
+                anchors.centerIn: parent
+                spacing: 6
+
+                MaterialSymbol {
+                    Layout.preferredWidth: breadcrumbButton.iconName === "" ? 0 : 18
+                    Layout.preferredHeight: 18
+                    visible: breadcrumbButton.iconName !== ""
+                    text: breadcrumbButton.iconName
+                    iconSize: 17
+                    fill: 1
+                    color: Appearance.colors.colOnSurfaceVariant
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: breadcrumbButton.label
+                    color: Appearance.colors.colOnSurface
+                    font.family: Sizes.fontFamily
+                    font.pixelSize: 12
+                    font.weight: breadcrumbButton.current ? Font.DemiBold : Font.Medium
                 }
             }
         }
@@ -664,8 +925,8 @@ ApplicationWindow {
         colBackgroundHover: Appearance.colors.colLayer3Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
         colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
-        colRipple: Appearance.colors.colLayer3Active
-        colRippleToggled: Appearance.colors.colSecondaryContainerActive
+        colRipple: Appearance.colors.colOnSurface
+        colRippleToggled: Appearance.colors.colOnSecondaryContainer
 
         contentItem: MaterialSymbol {
             text: toolButton.iconName
@@ -700,8 +961,8 @@ ApplicationWindow {
         colBackgroundHover: Appearance.colors.colLayer2Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
         colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
-        colRipple: Appearance.colors.colLayer2Active
-        colRippleToggled: Appearance.colors.colSecondaryContainerActive
+        colRipple: Appearance.colors.colOnSurface
+        colRippleToggled: Appearance.colors.colOnSecondaryContainer
         onClicked: root.navigateTo(locationButton.path)
 
         contentItem: RowLayout {
@@ -750,32 +1011,36 @@ ApplicationWindow {
         buttonRadiusPressed: Appearance.rounding.normal
         colBackground: primary ? Appearance.colors.colPrimary : Appearance.colors.colSurfaceContainerHighest
         colBackgroundHover: primary ? Appearance.colors.colPrimaryHover : Appearance.colors.colSurfaceContainerHighestHover
-        colRipple: primary ? Appearance.colors.colPrimaryActive : Appearance.colors.colSurfaceContainerHighestActive
+        colRipple: primary ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurface
 
-        contentItem: RowLayout {
-            id: actionContent
+        contentItem: Item {
+            RowLayout {
+                id: actionContent
 
-            spacing: 7
+                anchors.centerIn: parent
+                spacing: 7
 
-            MaterialSymbol {
-                Layout.preferredWidth: actionButton.iconName === "" ? 0 : 19
-                Layout.preferredHeight: 19
-                visible: actionButton.iconName !== ""
-                text: actionButton.iconName
-                iconSize: 18
-                color: actionButton.primary
-                    ? Appearance.colors.colOnPrimary
-                    : Appearance.colors.colOnSurface
-            }
+                MaterialSymbol {
+                    Layout.preferredWidth: actionButton.iconName === "" ? 0 : 19
+                    Layout.preferredHeight: 19
+                    visible: actionButton.iconName !== ""
+                    text: actionButton.iconName
+                    iconSize: 18
+                    color: actionButton.primary
+                        ? Appearance.colors.colOnPrimary
+                        : Appearance.colors.colOnSurface
+                }
 
-            Text {
-                text: actionButton.label
-                color: actionButton.primary
-                    ? Appearance.colors.colOnPrimary
-                    : Appearance.colors.colOnSurface
-                font.family: Sizes.fontFamily
-                font.pixelSize: 13
-                font.weight: Font.DemiBold
+                Text {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: actionButton.label
+                    color: actionButton.primary
+                        ? Appearance.colors.colOnPrimary
+                        : Appearance.colors.colOnSurface
+                    font.family: Sizes.fontFamily
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ Button {
     property real buttonRadiusPressed: buttonRadius
     readonly property real buttonEffectiveRadius: root.down ? root.buttonRadiusPressed : root.buttonRadius
     property int rippleDuration: 1200
+    property real rippleOpacity: 0.1
     property bool rippleEnabled: true
     property var downAction
     property var releaseAction
@@ -132,6 +133,7 @@ Button {
         id: pointerArea
 
         anchors.fill: parent
+        enabled: root.enabled
         hoverEnabled: true
         cursorShape: root.pointingHandCursor ? Qt.PointingHandCursor : Qt.ArrowCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
@@ -197,7 +199,7 @@ Button {
 
         PropertyAction { target: ripple; property: "x"; value: rippleAnim.x }
         PropertyAction { target: ripple; property: "y"; value: rippleAnim.y }
-        PropertyAction { target: ripple; property: "opacity"; value: 1 }
+        PropertyAction { target: ripple; property: "opacity"; value: root.rippleOpacity }
 
         RippleAnim {
             target: ripple
