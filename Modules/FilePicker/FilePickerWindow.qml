@@ -33,7 +33,6 @@ ApplicationWindow {
     readonly property string downloadsDir: StandardPaths.writableLocation(StandardPaths.DownloadLocation)
     readonly property bool hasSelection: selectedPath !== ""
     readonly property bool selectionValid: selectedPath !== "" && !selectedIsDir
-    readonly property var breadcrumbItems: buildBreadcrumbItems(currentPath)
 
     signal accepted(string path)
     signal rejected()
@@ -54,9 +53,15 @@ ApplicationWindow {
         if (mappedScreen)
             screen = mappedScreen;
     }
+    onCurrentPathChanged: Qt.callLater(refreshBreadcrumbs)
     onClosing: event => {
         event.accepted = false;
         dismiss();
+    }
+    Component.onCompleted: {
+        currentPath = normalizePath(currentPath) || normalizePath(picturesDir) || "/";
+        pathDraft = currentPath;
+        refreshBreadcrumbs();
     }
 
     function encodeFileUrl(path) {
@@ -109,6 +114,14 @@ ApplicationWindow {
         return items;
     }
 
+    function refreshBreadcrumbs() {
+        const items = buildBreadcrumbItems(currentPath);
+        breadcrumbModel.clear();
+        for (const item of items)
+            breadcrumbModel.append(item);
+        Qt.callLater(() => breadcrumbFlick.revealCurrent());
+    }
+
     function beginPathEditing() {
         pathDraft = currentPath;
         pathEditing = true;
@@ -149,6 +162,7 @@ ApplicationWindow {
         currentPath = normalizePath(path && path !== "" ? path : picturesDir) || picturesDir;
         pathEditing = false;
         pathDraft = currentPath;
+        refreshBreadcrumbs();
         clearSelection();
         const mappedScreen = qtScreenFor(targetScreen);
         if (mappedScreen)
@@ -194,6 +208,7 @@ ApplicationWindow {
         pathDraft = normalized;
         pathEditing = false;
         clearSelection();
+        refreshBreadcrumbs();
     }
 
     function navigateUp() {
@@ -231,6 +246,10 @@ ApplicationWindow {
         caseSensitive: false
         nameFilters: root.nameFilters
         sortField: FolderListModel.Name
+    }
+
+    ListModel {
+        id: breadcrumbModel
     }
 
     FocusScope {
@@ -492,14 +511,16 @@ ApplicationWindow {
                                             spacing: 2
 
                                             Repeater {
-                                                model: root.breadcrumbItems
+                                                model: breadcrumbModel
 
                                                 delegate: Row {
                                                     id: breadcrumbEntry
 
                                                     required property int index
-                                                    required property var modelData
-                                                    readonly property bool current: index === root.breadcrumbItems.length - 1
+                                                    required property string label
+                                                    required property string path
+                                                    required property string iconName
+                                                    readonly property bool current: index === breadcrumbModel.count - 1
 
                                                     height: breadcrumbRow.height
                                                     spacing: 2
@@ -515,9 +536,9 @@ ApplicationWindow {
 
                                                     BreadcrumbButton {
                                                         anchors.verticalCenter: parent.verticalCenter
-                                                        label: breadcrumbEntry.modelData.label
-                                                        path: breadcrumbEntry.modelData.path
-                                                        iconName: breadcrumbEntry.modelData.iconName
+                                                        label: breadcrumbEntry.label
+                                                        path: breadcrumbEntry.path
+                                                        iconName: breadcrumbEntry.iconName
                                                         current: breadcrumbEntry.current
                                                     }
                                                 }
@@ -557,16 +578,7 @@ ApplicationWindow {
 
                                     background: Rectangle {
                                         radius: Appearance.rounding.full
-                                        color: pathEditor.activeFocus
-                                            ? Appearance.colors.colPrimary
-                                            : Appearance.colors.colSurfaceContainerHighest
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            anchors.margins: pathEditor.activeFocus ? 2 : 0
-                                            radius: Appearance.rounding.full
-                                            color: Appearance.colors.colSurfaceContainerHighest
-                                        }
+                                        color: Appearance.colors.colSurfaceContainerHighest
                                     }
 
                                     onTextEdited: root.pathDraft = text
@@ -650,7 +662,6 @@ ApplicationWindow {
                                 rotation: appeared ? 0 : ((index % 3) - 1) * 3
                                 toggled: selected
                                 buttonRadius: Appearance.rounding.large
-                                buttonRadiusPressed: Appearance.rounding.normal
                                 colBackground: "transparent"
                                 colBackgroundHover: Appearance.colors.colLayer3Hover
                                 colBackgroundToggled: Appearance.colors.colSecondaryContainer
@@ -865,14 +876,13 @@ ApplicationWindow {
         padding: 0
         toggled: current
         buttonRadius: Appearance.rounding.small
-        buttonRadiusPressed: Appearance.rounding.extraSmall
         colBackground: "transparent"
         colBackgroundHover: Appearance.colors.colLayer3Hover
         colBackgroundToggled: Appearance.colors.colLayer3
         colBackgroundToggledHover: Appearance.colors.colLayer3Hover
         colRipple: Appearance.colors.colOnSurface
         colRippleToggled: Appearance.colors.colOnSurface
-        onClicked: {
+        releaseAction: () => {
             if (breadcrumbButton.current)
                 root.beginPathEditing();
             else
@@ -920,7 +930,6 @@ ApplicationWindow {
         padding: 0
         toggled: active
         buttonRadius: Appearance.rounding.full
-        buttonRadiusPressed: Appearance.rounding.normal
         colBackground: "transparent"
         colBackgroundHover: Appearance.colors.colLayer3Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
@@ -956,14 +965,13 @@ ApplicationWindow {
         padding: 0
         toggled: active
         buttonRadius: Appearance.rounding.full
-        buttonRadiusPressed: Appearance.rounding.normal
         colBackground: "transparent"
         colBackgroundHover: Appearance.colors.colLayer2Hover
         colBackgroundToggled: Appearance.colors.colSecondaryContainer
         colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
         colRipple: Appearance.colors.colOnSurface
         colRippleToggled: Appearance.colors.colOnSecondaryContainer
-        onClicked: root.navigateTo(locationButton.path)
+        releaseAction: () => root.navigateTo(locationButton.path)
 
         contentItem: RowLayout {
             spacing: 10
@@ -1008,7 +1016,6 @@ ApplicationWindow {
         implicitHeight: 44
         padding: 0
         buttonRadius: Appearance.rounding.full
-        buttonRadiusPressed: Appearance.rounding.normal
         colBackground: primary ? Appearance.colors.colPrimary : Appearance.colors.colSurfaceContainerHighest
         colBackgroundHover: primary ? Appearance.colors.colPrimaryHover : Appearance.colors.colSurfaceContainerHighestHover
         colRipple: primary ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurface
