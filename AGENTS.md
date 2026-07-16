@@ -122,7 +122,25 @@ Qt/C++ plugin 统一位于 `core/`：可复用 backend 代码在 `core/src/`，Q
 
 ## Commit 与 Pull Request 指南
 
-近期历史使用较短消息，例如 `update`、`Update README.md` 和中文摘要。建议使用简洁的祈使句 subject，并点明变更区域，例如 `Update launcher filtering` 或 `修复系统监控温度读取`。Pull request 应包含简要描述、受影响模块、运行过的命令，以及可见 UI 改动的截图或录屏。如有相关 issue 请链接，并明确说明新增 runtime dependency。
+Git commit subject 必须使用 `type: 描述` 格式。`type` 使用小写英文类型，后接英文冒号和一个空格；描述使用简洁、明确的语言说明本次提交，例如 `feat: 新增 Keystone 样式切换` 或 `fix: 修复文件选择器导航失效`。
+
+允许使用的类型如下：
+
+| type | 含义 |
+| --- | --- |
+| `feat` | 新功能 |
+| `fix` | 修复 bug |
+| `docs` | 文档修改 |
+| `style` | 代码格式、缩进或样式整理，不改变逻辑 |
+| `refactor` | 重构代码，不新增功能且不修复具体 bug |
+| `perf` | 性能优化 |
+| `test` | 测试相关 |
+| `build` | 构建系统、依赖或打包配置 |
+| `ci` | GitHub Actions、Cloudflare Pages 等 CI 配置 |
+| `chore` | 不属于以上类型的杂项维护 |
+| `revert` | 回滚提交 |
+
+后续所有 Git 提交均应遵循此约定。Pull request 应包含简要描述、受影响模块、运行过的命令，以及可见 UI 改动的截图或录屏。如有相关 issue 请链接，并明确说明新增 runtime dependency。
 
 ## 安全与配置提示
 
