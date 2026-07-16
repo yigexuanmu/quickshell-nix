@@ -546,17 +546,6 @@ Item {
                         accent: aqiSummary().color
                     }
 
-                    WeatherPollenCard {
-                        Layout.preferredWidth: (parent.width - parent.spacing) / 2
-                        Layout.preferredHeight: Layout.preferredWidth
-                        pollenMap: today().pollen || ({})
-                    }
-                }
-
-                RowLayout {
-                    width: parent.width
-                    spacing: 10
-
                     WeatherHumidityCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
@@ -565,6 +554,11 @@ Item {
                         dewPointText: fmtTemp(WeatherPlugin.currentDewPointC)
                         accent: humidityWaveAccent()
                     }
+                }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 10
 
                     WeatherUvCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
@@ -573,17 +567,17 @@ Item {
                         level: uvLevel(WeatherPlugin.currentUvIndex)
                         activeIndex: uvIndexBucket(WeatherPlugin.currentUvIndex)
                     }
-                }
-
-                RowLayout {
-                    width: parent.width
-                    spacing: 10
 
                     WeatherVisibilityCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
                         visibilityMeters: WeatherPlugin.currentVisibilityM
                     }
+                }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 10
 
                     WeatherPressureCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
