@@ -586,11 +586,6 @@ Item {
                         valueText: pressureValueText(WeatherPlugin.currentPressureHpa)
                         unitText: "hPa"
                     }
-                }
-
-                RowLayout {
-                    width: parent.width
-                    spacing: 10
 
                     WeatherAstroCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
@@ -602,6 +597,11 @@ Item {
                         setEpoch: today().sunset || 0
                         currentEpoch: root.currentEpoch
                     }
+                }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 10
 
                     WeatherAstroCard {
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
