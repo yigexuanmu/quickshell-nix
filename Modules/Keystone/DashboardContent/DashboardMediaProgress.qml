@@ -11,7 +11,7 @@ Item {
     property bool active: true
     property color foregroundColor: Appearance.colors.colPrimary
     property color trackColor: Appearance.colors.colSecondaryContainer
-    property real lineWidth: 6
+    property real lineWidth: 8
     property real spacing: 4
     property real waveFrequency: 8
     property real amplitudeMultiplier: 0.5

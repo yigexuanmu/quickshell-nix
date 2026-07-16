@@ -111,25 +111,21 @@ Item {
         id: coverContainer
 
         anchors.centerIn: mediaProgress
-        width: 200
-        height: 200
+        width: 180
+        height: 180
 
-        MaterialShape {
-            id: fallbackShape
+        Item {
+            id: shapeWrapper
 
-            anchors.centerIn: parent
-            implicitSize: parent.width
-            shape: MaterialShape.Cookie12Sided
-            color: Appearance.colors.colSurfaceContainerHighest
-            rotation: root.coverRotation
-            opacity: coverImage.status === Image.Ready ? 0 : 1
+            anchors.fill: parent
+            layer.enabled: true
 
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Appearance.animation.expressiveDefaultEffects.duration
-                    easing.type: Appearance.animation.expressiveDefaultEffects.type
-                    easing.bezierCurve: Appearance.animation.expressiveDefaultEffects.bezierCurve
-                }
+            MaterialShape {
+                anchors.centerIn: parent
+                implicitSize: parent.width
+                shape: MaterialShape.Cookie12Sided
+                color: Appearance.colors.colSurfaceContainerHighest
+                rotation: root.coverRotation
             }
         }
 
@@ -145,22 +141,11 @@ Item {
             visible: false
         }
 
-        MaterialShape {
-            id: coverMask
-
-            anchors.centerIn: parent
-            implicitSize: parent.width
-            shape: MaterialShape.Cookie12Sided
-            color: "white"
-            rotation: root.coverRotation
-            visible: false
-            layer.enabled: true
-        }
-
         OpacityMask {
             anchors.fill: parent
             source: coverImage
-            maskSource: coverMask
+            maskSource: shapeWrapper
+            cached: false
             opacity: coverImage.status === Image.Ready ? 1 : 0
             visible: opacity > 0
 
@@ -177,7 +162,7 @@ Item {
             anchors.centerIn: parent
             visible: coverImage.status === Image.Null || coverImage.status === Image.Error
             text: coverImage.status === Image.Error ? "broken_image" : "art_track"
-            iconSize: 64
+            iconSize: 56
             fill: 1
             color: Appearance.colors.colOnSurfaceVariant
         }
@@ -188,7 +173,7 @@ Item {
             anchors.centerIn: parent
             visible: coverImage.status === Image.Loading
             text: "progress_activity"
-            iconSize: 54
+            iconSize: 48
             color: Appearance.colors.colPrimary
 
             NumberAnimation on rotation {
