@@ -8,6 +8,8 @@ Item {
     signal closeRequested()
     signal avatarEditRequested()
 
+    property var player: null
+
     implicitWidth: 860
     implicitHeight: 520
 
@@ -45,6 +47,7 @@ Item {
                 anchors.leftMargin: 30
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
+                player: root.player
             }
         }
     }

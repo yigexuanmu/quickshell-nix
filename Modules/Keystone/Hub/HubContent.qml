@@ -119,6 +119,7 @@ Item {
         DashboardContent {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
+            player: root.player
             visible: root.currentIndex === 0
             opacity: visible ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 300 } }

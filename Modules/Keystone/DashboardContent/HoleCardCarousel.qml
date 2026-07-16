@@ -7,6 +7,7 @@ Item {
     clip: true
 
     property int currentIndex: 0
+    property var player: null
     readonly property int cardCount: 4
     readonly property real switchThreshold: width * 0.2
 
@@ -125,8 +126,10 @@ Item {
         height: root.height
         x: root.cardX(1)
 
-        PlaceholderText {
-            text: "音乐"
+        DashboardMediaCard {
+            anchors.fill: parent
+            player: root.player
+            active: root.visible && root.currentIndex === 1
         }
     }
 
