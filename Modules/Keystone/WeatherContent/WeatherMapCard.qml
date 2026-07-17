@@ -25,6 +25,7 @@ Rectangle {
     property var visibleTiles: []
     property real dragOffsetX: 0
     property real dragOffsetY: 0
+    property bool dragging: false
     property date layerUpdatedAt
     property date gridUpdatedAt
     property bool gridStale: false
@@ -56,14 +57,6 @@ Rectangle {
     radius: Appearance.rounding.large
     color: Appearance.colors.colSurfaceContainerHigh
     clip: true
-    layer.enabled: true
-    layer.effect: OpacityMask {
-        maskSource: Rectangle {
-            width: root.width
-            height: root.height
-            radius: root.radius
-        }
-    }
 
     Material.theme: Appearance.m3colors.darkmode ? Material.Dark : Material.Light
     Material.accent: Appearance.colors.colPrimary
@@ -472,6 +465,14 @@ Rectangle {
                 id: mapBackdrop
 
                 anchors.fill: parent
+                layer.enabled: true
+                layer.effect: OpacityMask {
+                    maskSource: Rectangle {
+                        width: mapBackdrop.width
+                        height: mapBackdrop.height
+                        radius: root.radius
+                    }
+                }
 
                 Rectangle {
                     anchors.fill: parent
@@ -482,8 +483,10 @@ Rectangle {
                     id: panningLayer
 
                     anchors.fill: parent
-                    x: root.dragOffsetX
-                    y: root.dragOffsetY
+                    transform: Translate {
+                        x: root.dragOffsetX
+                        y: root.dragOffsetY
+                    }
 
                     WeatherTileLayer {
                         id: tileLayer
@@ -542,6 +545,7 @@ Rectangle {
                 onPressed: mouse => {
                     pressedX = mouse.x
                     pressedY = mouse.y
+                    root.dragging = true
                     mouse.accepted = true
                 }
 
@@ -555,12 +559,14 @@ Rectangle {
 
                 onReleased: mouse => {
                     root.commitPan()
+                    root.dragging = false
                     mouse.accepted = true
                 }
 
                 onCanceled: {
                     root.dragOffsetX = 0
                     root.dragOffsetY = 0
+                    root.dragging = false
                 }
 
                 onWheel: wheel => {
@@ -630,6 +636,7 @@ Rectangle {
                 z: 20
                 backdropSource: mapBackdrop
                 backdropRect: Qt.rect(x, y, width, height)
+                backdropLive: !root.dragging
                 mode: root.selectedMode
                 updatedAt: root.selectedMode === "aqi"
                         ? root.gridUpdatedAt
@@ -662,6 +669,7 @@ Rectangle {
                         recenterButton.width,
                         recenterButton.height
                     )
+                    backdropLive: !root.dragging
                     radius: Appearance.rounding.full
                     blurAmount: 0.66
                     tint: recenterButton.down

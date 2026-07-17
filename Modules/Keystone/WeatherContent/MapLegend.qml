@@ -10,6 +10,7 @@ Rectangle {
     property bool stale: false
     property Item backdropSource: null
     property rect backdropRect: Qt.rect(0, 0, width, height)
+    property bool backdropLive: true
 
     implicitWidth: 184
     implicitHeight: 70
@@ -21,6 +22,7 @@ Rectangle {
         z: 0
         sourceItem: root.backdropSource
         sourceRect: root.backdropRect
+        backdropLive: root.backdropLive
         radius: root.radius
         blurAmount: 0.64
         tint: Appearance.applyAlpha(

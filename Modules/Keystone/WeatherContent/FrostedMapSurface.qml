@@ -8,6 +8,7 @@ Item {
 
     property Item sourceItem: null
     property rect sourceRect: Qt.rect(0, 0, width, height)
+    property bool backdropLive: true
     property real radius: Appearance.rounding.normal
     property real blurAmount: 0.58
     property color tint: Appearance.applyAlpha(
@@ -30,7 +31,7 @@ Item {
         anchors.fill: parent
         sourceItem: root.sourceItem
         sourceRect: root.sourceRect
-        live: true
+        live: root.backdropLive
         recursive: false
         visible: false
     }
