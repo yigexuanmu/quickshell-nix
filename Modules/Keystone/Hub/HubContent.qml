@@ -143,6 +143,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width * 0.95 
             height: 300
+            screen: root.screen
             visible: root.currentIndex === 2
             opacity: visible ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 300 } }
