@@ -225,7 +225,9 @@ Item {
             const dayPart = item.day || ({})
             nextDaily.push({
                 day: dayIndex === 0 ? "Today" : Qt.formatDate(dateObject, "ddd"),
+                date: Qt.formatDate(dateObject, "MMM d"),
                 icon: dayPart.iconName || item.iconName || "cloud",
+                description: dayPart.weatherText || item.weatherText || "Unknown",
                 maxTemp: Math.round(
                     Number(item.temperatureMaxC || dayPart.temperatureC || 0)
                 ) + "°",
@@ -854,7 +856,7 @@ Item {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: parent.modelData.icon
                                     iconSize: 22
-                                    fill: parent.modelData.isDaylight ? 1 : 0
+                                    fill: 0
                                     color: Appearance.colors.colOnSurfaceVariant
                                 }
 
@@ -927,61 +929,94 @@ Item {
                                 model: root.dailyData
 
                                 delegate: Rectangle {
+                                    id: dayCard
+
                                     required property int index
                                     required property var modelData
 
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    Layout.minimumWidth: 72
+                                    Layout.minimumWidth: 84
                                     radius: Appearance.rounding.normal
                                     color: index === 0
                                         ? Appearance.colors.colSecondaryContainer
                                         : Appearance.colors.colSurfaceContainerHighest
 
                                     Accessible.name: modelData.day
+                                        + ", " + modelData.date
+                                        + ", " + modelData.description
                                         + ", high " + modelData.maxTemp
                                         + ", low " + modelData.minTemp
 
                                     ColumnLayout {
                                         anchors.fill: parent
-                                        anchors.topMargin: 8
-                                        anchors.bottomMargin: 8
-                                        spacing: 2
+                                        anchors.margins: 10
+                                        spacing: 1
 
                                         Text {
                                             Layout.fillWidth: true
-                                            text: parent.parent.modelData.day
-                                            color: parent.parent.index === 0
+                                            text: dayCard.modelData.day
+                                            color: dayCard.index === 0
                                                 ? Appearance.colors.colOnSecondaryContainer
-                                                : Appearance.colors.colOnSurfaceVariant
+                                                : Appearance.colors.colOnSurface
                                             font.family: Sizes.fontFamily
-                                            font.pixelSize: 12
-                                            font.weight: Font.Medium
+                                            font.pixelSize: 16
+                                            font.weight: Font.DemiBold
                                             horizontalAlignment: Text.AlignHCenter
                                             elide: Text.ElideRight
                                             textFormat: Text.PlainText
                                         }
 
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: dayCard.modelData.date
+                                            color: dayCard.index === 0
+                                                ? Appearance.applyAlpha(
+                                                    Appearance.colors.colOnSecondaryContainer,
+                                                    0.72
+                                                )
+                                                : Appearance.colors.colOnSurfaceVariant
+                                            font.family: Sizes.fontFamily
+                                            font.pixelSize: 12
+                                            horizontalAlignment: Text.AlignHCenter
+                                            elide: Text.ElideRight
+                                            textFormat: Text.PlainText
+                                        }
+
+                                        Item {
+                                            Layout.fillHeight: true
+                                            Layout.minimumHeight: 2
+                                        }
+
                                         MaterialSymbol {
                                             Layout.alignment: Qt.AlignHCenter
-                                            Layout.fillHeight: true
-                                            text: parent.parent.modelData.icon
-                                            iconSize: 27
-                                            fill: 1
-                                            color: parent.parent.index === 0
+                                            Layout.preferredWidth: 38
+                                            Layout.preferredHeight: 38
+                                            text: dayCard.modelData.icon
+                                            iconSize: 34
+                                            fill: 0
+                                            color: dayCard.index === 0
                                                 ? Appearance.colors.colOnSecondaryContainer
-                                                : Appearance.colors.colPrimary
+                                                : Appearance.colors.colOnSurfaceVariant
+                                        }
+
+                                        Item {
+                                            Layout.fillHeight: true
+                                            Layout.minimumHeight: 2
                                         }
 
                                         Row {
                                             Layout.alignment: Qt.AlignHCenter
-                                            spacing: 5
+                                            spacing: 4
 
                                             Text {
-                                                text: parent.parent.parent.modelData.maxTemp
-                                                color: parent.parent.parent.index === 0
-                                                    ? Appearance.colors.colOnSecondaryContainer
-                                                    : Appearance.colors.colOnSurface
+                                                text: dayCard.modelData.minTemp
+                                                color: dayCard.index === 0
+                                                    ? Appearance.applyAlpha(
+                                                        Appearance.colors.colOnSecondaryContainer,
+                                                        0.76
+                                                    )
+                                                    : Appearance.colors.colOnSurfaceVariant
                                                 font.family: Sizes.fontFamilyMono
                                                 font.pixelSize: 13
                                                 font.weight: Font.DemiBold
@@ -989,15 +1024,26 @@ Item {
                                             }
 
                                             Text {
-                                                text: parent.parent.parent.modelData.minTemp
-                                                color: parent.parent.parent.index === 0
+                                                text: "/"
+                                                color: dayCard.index === 0
                                                     ? Appearance.applyAlpha(
                                                         Appearance.colors.colOnSecondaryContainer,
-                                                        0.72
+                                                        0.64
                                                     )
                                                     : Appearance.colors.colOnSurfaceVariant
                                                 font.family: Sizes.fontFamilyMono
-                                                font.pixelSize: 12
+                                                font.pixelSize: 13
+                                                textFormat: Text.PlainText
+                                            }
+
+                                            Text {
+                                                text: dayCard.modelData.maxTemp
+                                                color: dayCard.index === 0
+                                                    ? Appearance.colors.colOnSecondaryContainer
+                                                    : Appearance.colors.colOnSurface
+                                                font.family: Sizes.fontFamilyMono
+                                                font.pixelSize: 13
+                                                font.weight: Font.DemiBold
                                                 textFormat: Text.PlainText
                                             }
                                         }
