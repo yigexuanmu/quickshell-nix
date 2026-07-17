@@ -45,7 +45,7 @@ Rectangle {
         if (mode === "rain")
             return "Precipitation"
         if (mode === "aqi")
-            return "AQI · regional estimate"
+            return "AQI"
         return "Weather"
     }
 
