@@ -37,9 +37,9 @@ Item {
         property string iconName: ""
         property string label: ""
         property string value: "--"
-        property color containerColor: Appearance.colors.colSecondaryContainer
-        property color contentColor: Appearance.colors.colOnSecondaryContainer
-        property color accentColor: Appearance.colors.colOnSecondaryContainer
+        property color containerColor: Appearance.colors.colPrimary
+        property color contentColor: Appearance.colors.colOnPrimary
+        property color accentColor: Appearance.colors.colOnPrimary
 
         implicitHeight: 44
         radius: Appearance.rounding.small
@@ -510,9 +510,9 @@ Item {
                                     iconName: "thermostat"
                                     label: "Feels like"
                                     value: root.feelsLike
-                                    containerColor: Appearance.colors.colSecondaryContainer
-                                    contentColor: Appearance.colors.colOnSecondaryContainer
-                                    accentColor: Appearance.colors.colOnSecondaryContainer
+                                    containerColor: Appearance.colors.colPrimary
+                                    contentColor: Appearance.colors.colOnPrimary
+                                    accentColor: Appearance.colors.colOnPrimary
                                 }
 
                                 MetricTile {
@@ -520,9 +520,9 @@ Item {
                                     iconName: "water_drop"
                                     label: "Humidity"
                                     value: root.humidity
-                                    containerColor: Appearance.colors.colSecondaryContainer
-                                    contentColor: Appearance.colors.colOnSecondaryContainer
-                                    accentColor: Appearance.colors.colOnSecondaryContainer
+                                    containerColor: Appearance.colors.colPrimary
+                                    contentColor: Appearance.colors.colOnPrimary
+                                    accentColor: Appearance.colors.colOnPrimary
                                 }
 
                                 MetricTile {
@@ -530,9 +530,9 @@ Item {
                                     iconName: "air"
                                     label: "Wind"
                                     value: root.windSpeed
-                                    containerColor: Appearance.colors.colSecondaryContainer
-                                    contentColor: Appearance.colors.colOnSecondaryContainer
-                                    accentColor: Appearance.colors.colOnSecondaryContainer
+                                    containerColor: Appearance.colors.colPrimary
+                                    contentColor: Appearance.colors.colOnPrimary
+                                    accentColor: Appearance.colors.colOnPrimary
                                 }
 
                                 MetricTile {
@@ -540,9 +540,9 @@ Item {
                                     iconName: "compress"
                                     label: "Pressure"
                                     value: root.pressure
-                                    containerColor: Appearance.colors.colSecondaryContainer
-                                    contentColor: Appearance.colors.colOnSecondaryContainer
-                                    accentColor: Appearance.colors.colOnSecondaryContainer
+                                    containerColor: Appearance.colors.colPrimary
+                                    contentColor: Appearance.colors.colOnPrimary
+                                    accentColor: Appearance.colors.colOnPrimary
                                 }
                             }
                         }
