@@ -9,18 +9,10 @@ Item {
 
     ToolsBackend {
         id: toolsBackend
-        
-        // 【核心修复】：接收后端发来的 ESC 取消信号，并关闭主岛的录像状态
-        onRecordCancelled: {
-            console.log("用户按下了 ESC，取消了录制选区。")
-            toolsRoot.requestSetRecording(false)
-        }
     }
 
     // 预留给外部监听的关闭信号
     signal requestHideKeystone()
-    // 向 Keystone 发送录制状态变更信号
-    signal requestSetRecording(bool state)
     signal requestShowAudio(string mode)
 
     property var toolsModel: [
@@ -63,10 +55,8 @@ Item {
         if (selectedIndex === 0) {
             toolsBackend.pickColor()
         } else if (selectedIndex === 1) { // 录屏
-            toolsRoot.requestSetRecording(true)
             toolsBackend.startRecord("video")
         } else if (selectedIndex === 2) { // 录制 GIF
-            toolsRoot.requestSetRecording(true)
             toolsBackend.startRecord("gif")
         } else if (selectedIndex === 3) {
             toolsBackend.takeScreenshot()

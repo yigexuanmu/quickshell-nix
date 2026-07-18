@@ -71,6 +71,8 @@ target_include_directories(ClavisWeatherMapCore PUBLIC ${CMAKE_CURRENT_SOURCE_DI
 qt_add_library(ClavisNiriCore STATIC)
 target_sources(ClavisNiriCore PRIVATE
     niri_types.h
+    niri_cast_parser.h
+    niri_cast_parser.cpp
     niri_icon_lookup.h
     niri_icon_lookup.cpp
     niri_ipc_client.h
@@ -90,6 +92,31 @@ target_link_libraries(ClavisNiriCore PRIVATE
     Qt6::Network
 )
 target_include_directories(ClavisNiriCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+qt_add_library(ClavisRecordingCore STATIC)
+target_sources(ClavisRecordingCore PRIVATE
+    recording/recording_types.h
+    recording/recording_types.cpp
+    recording/process_identity.h
+    recording/process_identity.cpp
+    recording/recording_state_store.h
+    recording/recording_state_store.cpp
+    recording/slurp_selector.h
+    recording/slurp_selector.cpp
+    recording/gsr_backend.h
+    recording/gsr_backend.cpp
+    recording/ffmpeg_postprocessor.h
+    recording/ffmpeg_postprocessor.cpp
+    recording/dependency_probe.h
+    recording/dependency_probe.cpp
+    recording/recorder_controller.h
+    recording/recorder_controller.cpp
+)
+
+set_target_properties(ClavisRecordingCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_link_libraries(ClavisRecordingCore PRIVATE Qt6::Core)
+target_include_directories(ClavisRecordingCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 qt_add_library(ClavisAudioCore STATIC)
 target_sources(ClavisAudioCore PRIVATE

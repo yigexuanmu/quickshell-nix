@@ -66,7 +66,7 @@ Variants {
         property real topEdgeCurveTopControlX: 0.42
 
         function cancelRecord(): string {
-            root.isRecording = false;
+            RecordingService.refresh();
             return "RECORD_CANCELLED";
         }
 
@@ -300,7 +300,7 @@ Variants {
                 
                 property string currentAudioMode: "mic" 
                 property int hubTabIndex: 0
-                property bool isRecording: false
+                readonly property bool isRecording: RecordingCoordinator.ownRecordingActive
 
                 property bool isLyricsMode: showLyrics
                 property bool isToolsMode: showTools && !isLyricsMode
@@ -685,7 +685,6 @@ Variants {
                         Behavior on opacity { NumberAnimation { duration: 200 } }
 
                         onRequestHideKeystone: { root.showTools = false }
-                        onRequestSetRecording: (state) => { root.isRecording = state }
                         onRequestShowAudio: (mode) => { 
                             root.currentAudioMode = mode
                             root.showTools = false
@@ -835,7 +834,6 @@ Variants {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.isRecording = false 
                         toolsWidget.stopRecording() 
                     }
                 }
