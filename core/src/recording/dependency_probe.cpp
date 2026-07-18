@@ -1,5 +1,6 @@
 #include "dependency_probe.h"
 
+#include "audio/audio_source_resolver.h"
 #include "recording_state_store.h"
 
 #include <QDir>
@@ -20,12 +21,13 @@ QJsonObject DependencyCheck::toJson() const
     };
 }
 
-QList<DependencyCheck> DependencyProbe::run(const QString &outputDirectory) const
+QList<DependencyCheck> DependencyProbe::run(const QString &outputDirectory,
+                                            bool includeAudio) const
 {
     const QString output =
         outputDirectory.isEmpty() ? defaultOutputDirectory() : outputDirectory;
     RecordingStateStore store;
-    return {
+    QList<DependencyCheck> checks{
         executable(QStringLiteral("gpu-screen-recorder")),
         executable(QStringLiteral("slurp")),
         executable(QStringLiteral("ffmpeg")),
@@ -34,6 +36,14 @@ QList<DependencyCheck> DependencyProbe::run(const QString &outputDirectory) cons
         directory(QStringLiteral("output-directory"), output, true),
         directory(QStringLiteral("runtime-directory"), store.runtimeDirectory(), true),
     };
+    if (includeAudio) {
+        checks.append(executable(QStringLiteral("pactl")));
+        checks.append(audioSource(AudioSourceType::Microphone));
+        checks.append(audioSource(AudioSourceType::System));
+        checks.append(directory(QStringLiteral("audio-output-directory"),
+                                defaultAudioOutputDirectory(), true));
+    }
+    return checks;
 }
 
 bool DependencyProbe::allPassed(const QList<DependencyCheck> &checks)
@@ -55,6 +65,14 @@ QString DependencyProbe::defaultOutputDirectory(RecordingType type)
                                     : QStringLiteral("Clavis"));
 }
 
+QString DependencyProbe::defaultAudioOutputDirectory()
+{
+    QString music = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
+    if (music.isEmpty())
+        music = QDir::home().filePath(QStringLiteral("Music"));
+    return QDir(music).filePath(QStringLiteral("Clavis/Audio"));
+}
+
 DependencyCheck DependencyProbe::executable(const QString &name)
 {
     const QString path = QStandardPaths::findExecutable(name);
@@ -63,6 +81,21 @@ DependencyCheck DependencyProbe::executable(const QString &name)
         !path.isEmpty(),
         path,
         path.isEmpty() ? QStringLiteral("Not found in PATH") : QStringLiteral("Available"),
+    };
+}
+
+DependencyCheck DependencyProbe::audioSource(AudioSourceType type)
+{
+    const AudioSourceResolution resolution = AudioSourceResolver().resolve(type);
+    const QString name = type == AudioSourceType::System
+        ? QStringLiteral("system-audio-source")
+        : QStringLiteral("microphone-source");
+    return {
+        name,
+        resolution.ok,
+        resolution.ok ? resolution.source.name : QString(),
+        resolution.ok ? resolution.source.description
+                      : resolution.error.message,
     };
 }
 

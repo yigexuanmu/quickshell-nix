@@ -1,5 +1,6 @@
 #include "command_router.h"
 
+#include "commands/audio_command.h"
 #include "commands/cast_command.h"
 #include "commands/doctor_command.h"
 #include "commands/record_command.h"
@@ -30,6 +31,8 @@ CommandResult CommandRouter::route(const QStringList &arguments) const
     const QStringList rest = arguments.mid(1);
     if (command == QStringLiteral("doctor"))
         return DoctorCommand().run(rest);
+    if (command == QStringLiteral("audio"))
+        return AudioCommand().run(rest);
     if (command == QStringLiteral("record"))
         return RecordCommand().run(rest);
     if (command == QStringLiteral("cast"))
@@ -46,6 +49,9 @@ QString CommandRouter::helpText()
         "Usage:\n"
         "  key [--help] [--version]\n"
         "  key doctor [--json] [--output DIRECTORY]\n"
+        "  key audio start --source mic|system [--output DIRECTORY] [--json]\n"
+        "  key audio status [--json]\n"
+        "  key audio stop [--json]\n"
         "  key record start --type video|gif --target region [options]\n"
         "  key record status [--json]\n"
         "  key record stop [--json]\n"

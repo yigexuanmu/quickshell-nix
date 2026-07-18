@@ -15,6 +15,13 @@ namespace Clavis::Recording {
 OperationResult RecorderController::start(const StartOptions &options)
 {
     RecordingError error;
+    std::unique_ptr<QLockFile> captureLock = m_captureGuard.acquire(&error);
+    if (!captureLock)
+        return failure(error.code == QStringLiteral("capture_busy")
+                           ? SessionConflict
+                           : DependencyFailure,
+                       error);
+
     std::unique_ptr<QLockFile> lock = m_store.acquireLock(&error);
     if (!lock)
         return failure(error.code == QStringLiteral("recording_busy")
@@ -54,6 +61,17 @@ OperationResult RecorderController::start(const StartOptions &options)
                       QStringLiteral("A Clavis recording session is already active"),
                       {{QStringLiteral("state"), recordingStateName(current.state)},
                        {QStringLiteral("sessionId"), current.sessionId}}),
+            current);
+    }
+
+    const CaptureConflict conflict =
+        m_captureGuard.conflictExcluding(QStringLiteral("screen"));
+    if (conflict.active) {
+        return failure(
+            SessionConflict,
+            makeError(QStringLiteral("capture_session_conflict"),
+                      QStringLiteral("Another Clavis capture session is already active"),
+                      {{QStringLiteral("conflict"), conflict.toJson()}}),
             current);
     }
 

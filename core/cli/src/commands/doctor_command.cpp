@@ -36,7 +36,8 @@ CommandResult DoctorCommand::run(const QStringList &arguments) const
     if (outputDirectory.startsWith(QStringLiteral("~/")))
         outputDirectory.replace(0, 1, QDir::homePath());
 
-    const QList<DependencyCheck> checks = DependencyProbe().run(outputDirectory);
+    const QList<DependencyCheck> checks =
+        DependencyProbe().run(outputDirectory, true);
     const bool ok = DependencyProbe::allPassed(checks);
     QJsonArray checksJson;
     QStringList lines;

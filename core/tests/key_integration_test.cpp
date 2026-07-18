@@ -20,7 +20,12 @@ private slots:
     void reportsRecorderStartFailure();
     void recordsAndFinalizesVideo();
     void recordsAndConvertsGif();
+    void screenRecordingDoesNotRequireAudioSources();
     void retriesFailedFinalization();
+    void recordsMicrophoneAudio();
+    void recordsSystemAudio();
+    void rejectsUnavailableAudioSource();
+    void rejectsCrossCaptureConflicts();
 
 private:
     struct KeyResult {
@@ -31,6 +36,7 @@ private:
 
     KeyResult runKey(const QStringList &arguments, int timeoutMs = 30000);
     void exerciseLifecycle(const QString &type, const QString &extension);
+    void exerciseAudioLifecycle(const QString &source, bool captureSink);
 
     std::unique_ptr<QTemporaryDir> m_temporary;
     QProcessEnvironment m_environment;
@@ -102,6 +108,106 @@ void KeyIntegrationTest::recordsAndFinalizesVideo()
 void KeyIntegrationTest::recordsAndConvertsGif()
 {
     exerciseLifecycle(QStringLiteral("gif"), QStringLiteral("gif"));
+}
+
+void KeyIntegrationTest::screenRecordingDoesNotRequireAudioSources()
+{
+    m_environment.insert(QStringLiteral("CLAVIS_TEST_NO_MIC"), QStringLiteral("1"));
+    m_environment.insert(QStringLiteral("CLAVIS_TEST_NO_MONITOR"), QStringLiteral("1"));
+    exerciseLifecycle(QStringLiteral("video"), QStringLiteral("mp4"));
+}
+
+void KeyIntegrationTest::recordsMicrophoneAudio()
+{
+    exerciseAudioLifecycle(QStringLiteral("mic"), false);
+}
+
+void KeyIntegrationTest::recordsSystemAudio()
+{
+    exerciseAudioLifecycle(QStringLiteral("system"), true);
+}
+
+void KeyIntegrationTest::rejectsUnavailableAudioSource()
+{
+    m_environment.insert(QStringLiteral("CLAVIS_TEST_NO_MIC"), QStringLiteral("1"));
+    const KeyResult start = runKey({
+        QStringLiteral("audio"),
+        QStringLiteral("start"),
+        QStringLiteral("--source"),
+        QStringLiteral("mic"),
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(start.exitCode, 3);
+    QCOMPARE(start.json.value(QStringLiteral("state")).toString(),
+             QStringLiteral("idle"));
+    QCOMPARE(start.json.value(QStringLiteral("error")).toObject()
+                 .value(QStringLiteral("code")).toString(),
+             QStringLiteral("microphone_unavailable"));
+}
+
+void KeyIntegrationTest::rejectsCrossCaptureConflicts()
+{
+    const KeyResult audioStart = runKey({
+        QStringLiteral("audio"),
+        QStringLiteral("start"),
+        QStringLiteral("--source"),
+        QStringLiteral("mic"),
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(audioStart.exitCode, 0);
+    m_recorderPid = audioStart.json.value(QStringLiteral("pid")).toInteger();
+    QVERIFY(m_recorderPid > 0);
+
+    const KeyResult blockedScreen = runKey({
+        QStringLiteral("record"),
+        QStringLiteral("start"),
+        QStringLiteral("--type"),
+        QStringLiteral("video"),
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(blockedScreen.exitCode, 4);
+    QCOMPARE(blockedScreen.json.value(QStringLiteral("error")).toObject()
+                 .value(QStringLiteral("code")).toString(),
+             QStringLiteral("capture_session_conflict"));
+    QCOMPARE(runKey({QStringLiteral("audio"), QStringLiteral("stop"),
+                     QStringLiteral("--json")}).exitCode, 0);
+    m_recorderPid = 0;
+
+    const KeyResult screenStart = runKey({
+        QStringLiteral("record"),
+        QStringLiteral("start"),
+        QStringLiteral("--type"),
+        QStringLiteral("video"),
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(screenStart.exitCode, 0);
+    m_recorderPid = screenStart.json.value(QStringLiteral("pid")).toInteger();
+    QVERIFY(m_recorderPid > 0);
+
+    const KeyResult blockedAudio = runKey({
+        QStringLiteral("audio"),
+        QStringLiteral("start"),
+        QStringLiteral("--source"),
+        QStringLiteral("system"),
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(blockedAudio.exitCode, 4);
+    QCOMPARE(blockedAudio.json.value(QStringLiteral("error")).toObject()
+                 .value(QStringLiteral("code")).toString(),
+             QStringLiteral("capture_session_conflict"));
+    QCOMPARE(runKey({QStringLiteral("record"), QStringLiteral("stop"),
+                     QStringLiteral("--json")}).exitCode, 0);
+    m_recorderPid = 0;
 }
 
 void KeyIntegrationTest::reportsMissingDependencies()
@@ -257,6 +363,74 @@ void KeyIntegrationTest::exerciseLifecycle(const QString &type, const QString &e
         runKey({QStringLiteral("record"), QStringLiteral("status"), QStringLiteral("--json")});
     QCOMPARE(idle.exitCode, 0);
     QCOMPARE(idle.json.value(QStringLiteral("state")).toString(), QStringLiteral("idle"));
+    QCOMPARE(idle.json.value(QStringLiteral("outputPath")).toString(), outputPath);
+}
+
+void KeyIntegrationTest::exerciseAudioLifecycle(const QString &source,
+                                                bool captureSink)
+{
+    const KeyResult start = runKey({
+        QStringLiteral("audio"),
+        QStringLiteral("start"),
+        QStringLiteral("--source"),
+        source,
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(start.exitCode, 0);
+    QCOMPARE(start.json.value(QStringLiteral("ok")).toBool(), true);
+    QCOMPARE(start.json.value(QStringLiteral("state")).toString(),
+             QStringLiteral("recording"));
+    QCOMPARE(start.json.value(QStringLiteral("source")).toObject()
+                 .value(QStringLiteral("type")).toString(), source);
+    QCOMPARE(start.json.value(QStringLiteral("source")).toObject()
+                 .value(QStringLiteral("captureSink")).toBool(), captureSink);
+    QVERIFY(start.json.value(QStringLiteral("startedAtMs")).toInteger() > 0);
+    m_recorderPid = start.json.value(QStringLiteral("pid")).toInteger();
+    QVERIFY(m_recorderPid > 0);
+
+    const KeyResult status = runKey({
+        QStringLiteral("audio"), QStringLiteral("status"), QStringLiteral("--json")
+    });
+    QCOMPARE(status.exitCode, 0);
+    QCOMPARE(status.json.value(QStringLiteral("state")).toString(),
+             QStringLiteral("recording"));
+    QCOMPARE(status.json.value(QStringLiteral("pid")).toInteger(), m_recorderPid);
+
+    const KeyResult duplicate = runKey({
+        QStringLiteral("audio"),
+        QStringLiteral("start"),
+        QStringLiteral("--source"),
+        source,
+        QStringLiteral("--output"),
+        m_temporary->filePath(QStringLiteral("output")),
+        QStringLiteral("--json"),
+    });
+    QCOMPARE(duplicate.exitCode, 4);
+    QCOMPARE(duplicate.json.value(QStringLiteral("error")).toObject()
+                 .value(QStringLiteral("code")).toString(),
+             QStringLiteral("audio_recording_already_active"));
+
+    const KeyResult stop = runKey({
+        QStringLiteral("audio"), QStringLiteral("stop"), QStringLiteral("--json")
+    });
+    m_recorderPid = 0;
+    QCOMPARE(stop.exitCode, 0);
+    QCOMPARE(stop.json.value(QStringLiteral("ok")).toBool(), true);
+    QCOMPARE(stop.json.value(QStringLiteral("state")).toString(),
+             QStringLiteral("idle"));
+    const QString outputPath = stop.json.value(QStringLiteral("outputPath")).toString();
+    QVERIFY(outputPath.endsWith(QStringLiteral(".m4a")));
+    QVERIFY(QFileInfo(outputPath).isFile());
+    QVERIFY(QFileInfo(outputPath).size() > 0);
+
+    const KeyResult idle = runKey({
+        QStringLiteral("audio"), QStringLiteral("status"), QStringLiteral("--json")
+    });
+    QCOMPARE(idle.exitCode, 0);
+    QCOMPARE(idle.json.value(QStringLiteral("state")).toString(),
+             QStringLiteral("idle"));
     QCOMPARE(idle.json.value(QStringLiteral("outputPath")).toString(), outputPath);
 }
 

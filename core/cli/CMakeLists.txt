@@ -5,6 +5,8 @@ qt_add_executable(key
     src/command_router.cpp
     src/commands/doctor_command.h
     src/commands/doctor_command.cpp
+    src/commands/audio_command.h
+    src/commands/audio_command.cpp
     src/commands/record_command.h
     src/commands/record_command.cpp
     src/commands/cast_command.h

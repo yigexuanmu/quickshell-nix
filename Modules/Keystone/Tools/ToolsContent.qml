@@ -11,9 +11,7 @@ Item {
         id: toolsBackend
     }
 
-    // 预留给外部监听的关闭信号
     signal requestHideKeystone()
-    signal requestShowAudio(string mode)
 
     property var toolsModel: [
         { icon: "colorize",         tip: "取色器" },
@@ -22,8 +20,8 @@ Item {
         { icon: "crop_free",        tip: "普通截屏" },
         { icon: "height",           tip: "截长屏" },
         { icon: "document_scanner", tip: "OCR 识别" },
-        { icon: "mic",              tip: "录麦克风" },       // 索引 6
-        { icon: "speaker",          tip: "录电脑声音" }      // 【新增】：索引 7
+        { icon: "mic",              tip: "录麦克风" },
+        { icon: "speaker",          tip: "录电脑声音" }
     ]
 
     property int selectedIndex: 0
@@ -54,24 +52,21 @@ Item {
         
         if (selectedIndex === 0) {
             toolsBackend.pickColor()
-        } else if (selectedIndex === 1) { // 录屏
+        } else if (selectedIndex === 1) {
             toolsBackend.startRecord("video")
-        } else if (selectedIndex === 2) { // 录制 GIF
+        } else if (selectedIndex === 2) {
             toolsBackend.startRecord("gif")
         } else if (selectedIndex === 3) {
             toolsBackend.takeScreenshot()
-        } else if (selectedIndex === 6) { // 录音 - 麦克风
-            toolsRoot.requestShowAudio("mic")
-            toolsBackend.startAudio("audio_mic")
-        } else if (selectedIndex === 7) { // 录音 - 系统声音
-            toolsRoot.requestShowAudio("sys")
-            toolsBackend.startAudio("audio_sys")
+        } else if (selectedIndex === 6) {
+            toolsBackend.startAudio("mic")
+        } else if (selectedIndex === 7) {
+            toolsBackend.startAudio("system")
         } else {
             console.log("该工具的后端尚未实现！")
         }
     }
 
-    // 【核心修复】：保留唯一的一个停止录制接口
     function stopRecording() {
         toolsBackend.stopRecord()
     }

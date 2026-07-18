@@ -1,5 +1,6 @@
 #pragma once
 
+#include "capture_session_guard.h"
 #include "dependency_probe.h"
 #include "ffmpeg_postprocessor.h"
 #include "gsr_backend.h"
@@ -16,6 +17,7 @@ public:
 
 private:
     RecordingStateStore m_store;
+    CaptureSessionGuard m_captureGuard;
     SlurpSelector m_selector;
     GsrBackend m_backend;
     FfmpegPostprocessor m_postprocessor;

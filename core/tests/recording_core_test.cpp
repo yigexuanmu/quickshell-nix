@@ -1,4 +1,6 @@
 #include "niri_cast_parser.h"
+#include "recording/audio/audio_recording_types.h"
+#include "recording/audio/audio_source_resolver.h"
 #include "recording/gsr_backend.h"
 #include "recording/recording_types.h"
 #include "recording/slurp_selector.h"
@@ -16,6 +18,7 @@ private slots:
     void rejectsInvalidRegionGeometry();
     void roundTripsRecordingState();
     void buildsShellFreeGsrArguments();
+    void resolvesMicrophoneAndSystemMonitor();
     void parsesNiriCastSchema();
 };
 
@@ -85,6 +88,61 @@ void RecordingCoreTest::buildsShellFreeGsrArguments()
     QCOMPARE(arguments.last(), session.temporaryPath);
     QVERIFY(!arguments.contains(QStringLiteral("sh")));
     QVERIFY(!arguments.contains(QStringLiteral("-c")));
+}
+
+void RecordingCoreTest::resolvesMicrophoneAndSystemMonitor()
+{
+    const QJsonObject serverInfo{
+        {QStringLiteral("default_source_name"), QStringLiteral("test.mic")},
+        {QStringLiteral("default_sink_name"), QStringLiteral("test.sink")},
+    };
+    const QJsonArray sources{
+        QJsonObject{
+            {QStringLiteral("name"), QStringLiteral("test.mic")},
+            {QStringLiteral("description"), QStringLiteral("Microphone")},
+            {QStringLiteral("state"), QStringLiteral("RUNNING")},
+            {QStringLiteral("properties"),
+             QJsonObject{{QStringLiteral("node.name"),
+                          QStringLiteral("test.mic.node")}}},
+        },
+        QJsonObject{
+            {QStringLiteral("name"), QStringLiteral("test.sink.monitor")},
+            {QStringLiteral("description"), QStringLiteral("Monitor")},
+            {QStringLiteral("state"), QStringLiteral("IDLE")},
+            {QStringLiteral("properties"),
+             QJsonObject{{QStringLiteral("node.name"),
+                          QStringLiteral("test.monitor.node")},
+                         {QStringLiteral("device.class"),
+                          QStringLiteral("monitor")}}},
+        },
+    };
+    const QJsonArray sinks{
+        QJsonObject{
+            {QStringLiteral("name"), QStringLiteral("test.sink")},
+            {QStringLiteral("description"), QStringLiteral("Output")},
+            {QStringLiteral("monitor_source"),
+             QStringLiteral("test.sink.monitor")},
+            {QStringLiteral("properties"),
+             QJsonObject{{QStringLiteral("node.name"),
+                          QStringLiteral("test.sink.node")}}},
+        },
+    };
+
+    const AudioSourceResolution microphone =
+        AudioSourceResolver::resolveFromJson(
+            AudioSourceType::Microphone, serverInfo, sources, sinks);
+    QVERIFY(microphone.ok);
+    QCOMPARE(microphone.source.name, QStringLiteral("test.mic"));
+    QCOMPARE(microphone.source.nodeName, QStringLiteral("test.mic.node"));
+    QVERIFY(!microphone.source.captureSink);
+
+    const AudioSourceResolution system =
+        AudioSourceResolver::resolveFromJson(
+            AudioSourceType::System, serverInfo, sources, sinks);
+    QVERIFY(system.ok);
+    QCOMPARE(system.source.name, QStringLiteral("test.sink.monitor"));
+    QCOMPARE(system.source.nodeName, QStringLiteral("test.sink.node"));
+    QVERIFY(system.source.captureSink);
 }
 
 void RecordingCoreTest::parsesNiriCastSchema()

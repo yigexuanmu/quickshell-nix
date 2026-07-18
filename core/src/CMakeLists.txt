@@ -99,6 +99,8 @@ target_sources(ClavisRecordingCore PRIVATE
     recording/recording_types.cpp
     recording/process_identity.h
     recording/process_identity.cpp
+    recording/capture_session_guard.h
+    recording/capture_session_guard.cpp
     recording/recording_state_store.h
     recording/recording_state_store.cpp
     recording/slurp_selector.h
@@ -111,6 +113,18 @@ target_sources(ClavisRecordingCore PRIVATE
     recording/dependency_probe.cpp
     recording/recorder_controller.h
     recording/recorder_controller.cpp
+    recording/audio/audio_recording_types.h
+    recording/audio/audio_recording_types.cpp
+    recording/audio/audio_recording_state_store.h
+    recording/audio/audio_recording_state_store.cpp
+    recording/audio/audio_source_resolver.h
+    recording/audio/audio_source_resolver.cpp
+    recording/audio/ffmpeg_audio_backend.h
+    recording/audio/ffmpeg_audio_backend.cpp
+    recording/audio/audio_file_finalizer.h
+    recording/audio/audio_file_finalizer.cpp
+    recording/audio/audio_recorder_controller.h
+    recording/audio/audio_recorder_controller.cpp
 )
 
 set_target_properties(ClavisRecordingCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -122,6 +136,8 @@ qt_add_library(ClavisAudioCore STATIC)
 target_sources(ClavisAudioCore PRIVATE
     audio_collector.h
     audio_collector.cpp
+    audio_level_collector.h
+    audio_level_collector.cpp
 )
 
 set_target_properties(ClavisAudioCore PROPERTIES POSITION_INDEPENDENT_CODE ON)

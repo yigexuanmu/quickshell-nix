@@ -13,7 +13,7 @@ target_link_libraries(clavis_core_tests PRIVATE
 
 add_test(NAME clavis_core_tests COMMAND clavis_core_tests)
 
-foreach(tool_target IN ITEMS fake_slurp fake_gsr fake_ffmpeg fake_ffprobe)
+foreach(tool_target IN ITEMS fake_slurp fake_gsr fake_ffmpeg fake_ffprobe fake_pactl)
     qt_add_executable(${tool_target}
         fake_recording_tool.cpp
     )
@@ -27,6 +27,7 @@ set_target_properties(fake_slurp PROPERTIES OUTPUT_NAME slurp)
 set_target_properties(fake_gsr PROPERTIES OUTPUT_NAME gpu-screen-recorder)
 set_target_properties(fake_ffmpeg PROPERTIES OUTPUT_NAME ffmpeg)
 set_target_properties(fake_ffprobe PROPERTIES OUTPUT_NAME ffprobe)
+set_target_properties(fake_pactl PROPERTIES OUTPUT_NAME pactl)
 
 qt_add_executable(key_integration_tests
     key_integration_test.cpp
@@ -48,6 +49,7 @@ add_dependencies(key_integration_tests
     fake_gsr
     fake_ffmpeg
     fake_ffprobe
+    fake_pactl
 )
 
 add_test(NAME key_integration_tests COMMAND key_integration_tests)

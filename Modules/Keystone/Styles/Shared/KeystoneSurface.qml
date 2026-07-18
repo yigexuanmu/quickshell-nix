@@ -15,7 +15,6 @@ import qs.Modules.Keystone.VolumeContent
 import qs.Modules.Keystone.LyricsContent 
 import qs.Modules.Keystone.Hub
 import qs.Modules.Keystone.Tools
-import qs.Modules.Keystone.audio 
 import qs.Modules.Keystone.Styles.Recording
 
 Variants {
@@ -74,7 +73,6 @@ Variants {
         function closeAllOthers(): string {
             root.showLyrics = false;
             root.showTools = false;
-            root.showAudio = false;
             root.expanded = false;
             return "OTHERS_CLOSED";
         }
@@ -305,9 +303,6 @@ Variants {
                 property bool showVolume: false
                 property bool showHub: false
                 property bool showTools: false 
-                property bool showAudio: false 
-                
-                property string currentAudioMode: "mic" 
                 property int hubTabIndex: 0
                 property bool pillStopFusionMinimumActive: false
                 readonly property bool backendFinalizing: RecordingService.isFinalizing
@@ -325,16 +320,27 @@ Variants {
                     || recordingActionProgress > 0.01
                     || processingContentProgress > 0.01
 
-                property bool isLyricsMode: showLyrics && !recordingPresentationActive
-                property bool isToolsMode: !recordingPresentationActive && showTools && !isLyricsMode
-                property bool isHubMode: !recordingPresentationActive && showHub && !isToolsMode && !isLyricsMode
-                property bool isAudioMode: !recordingPresentationActive && showAudio && !isHubMode && !isToolsMode && !isLyricsMode
-                property bool isVolumeMode: !recordingPresentationActive && showVolume && !expanded && !isAudioMode && !isHubMode && !isToolsMode && !isLyricsMode
-                property bool isNotifMode: !recordingPresentationActive && NotificationManager.hasNotifs && !expanded && !showVolume && !isAudioMode && !isHubMode && !isToolsMode && !isLyricsMode
-                property bool isCollapsedMode: !recordingPresentationActive && !expanded && !isNotifMode && !isVolumeMode && !isAudioMode && !isLyricsMode && !isHubMode && !isToolsMode
+                property bool audioWasActive: false
+                property bool audioExitActive: false
+                property bool audioGeometryExitActive: false
+                property bool audioWidthCollapsing: false
+                readonly property bool audioSessionActive: AudioRecordingService.isActive
+                readonly property bool audioPresentationActive: audioSessionActive
+                    || audioExitActive
+                readonly property bool audioGeometryActive: audioSessionActive
+                    || audioGeometryExitActive
+                readonly property bool contentPresentationActive:
+                    recordingPresentationActive || audioPresentationActive
+
+                property bool isLyricsMode: showLyrics && !contentPresentationActive
+                property bool isToolsMode: !contentPresentationActive && showTools && !isLyricsMode
+                property bool isHubMode: !contentPresentationActive && showHub && !isToolsMode && !isLyricsMode
+                property bool isVolumeMode: !contentPresentationActive && showVolume && !expanded && !isHubMode && !isToolsMode && !isLyricsMode
+                property bool isNotifMode: !contentPresentationActive && NotificationManager.hasNotifs && !expanded && !showVolume && !isHubMode && !isToolsMode && !isLyricsMode
+                property bool isCollapsedMode: !contentPresentationActive && !expanded && !isNotifMode && !isVolumeMode && !isLyricsMode && !isHubMode && !isToolsMode
                 property bool isCollapsedHovered: isCollapsedMode && (keystoneMouseArea.containsMouse || collapsedInputArea.containsMouse)
-                property bool hasClosablePopup: !recordingPresentationActive
-                    && (expanded || isLyricsMode || isHubMode || isToolsMode || isAudioMode)
+                property bool hasClosablePopup: !contentPresentationActive
+                    && (expanded || isLyricsMode || isHubMode || isToolsMode)
                 
                 property bool showDashboardHole: isHubMode && hubTabIndex === 0
 
@@ -352,7 +358,8 @@ Variants {
                 property int toolsW: 480; property int toolsH: 72
                 property int notifW: 380; property int notifH: (NotificationManager.popupList.length * 70) + 20
                 property int volW: 320; property int volH: 64
-                property int audioW: 360; property int audioH: 84 
+                property int audioW: KeystoneMotion.audioRecordingWidth
+                property int audioH: collapsedH + KeystoneMotion.audioRecordingHeightDelta
                 
                 property color color: Appearance.colors.colLayer0
                 clip: true
@@ -366,7 +373,7 @@ Variants {
                     ? (styleSurface.detached
                         ? pillRecordingVisual.mainLayoutWidth
                         : recordingBangsW) :
-                    isAudioMode ? audioW :
+                    audioGeometryActive ? audioW :
                     isToolsMode ? toolsW :
                     isHubMode ? hub.implicitWidth : 
                     isLyricsMode ? lyricsW : 
@@ -377,7 +384,7 @@ Variants {
 
                 property int targetH: recordingPresentationActive
                     ? collapsedH :
-                        isAudioMode ? audioH :
+                        audioGeometryActive ? audioH :
                         isToolsMode ? toolsH : 
                         isHubMode ? hub.implicitHeight : 
                         isLyricsMode ? lyricsH : 
@@ -396,6 +403,31 @@ Variants {
                 width: targetW
                 height: targetH
                 property real radius: targetR
+
+                onAudioSessionActiveChanged: {
+                    if (root.audioSessionActive) {
+                        root.audioWasActive = true;
+                        root.audioExitActive = false;
+                        root.audioGeometryExitActive = false;
+                        root.audioWidthCollapsing = false;
+                        root.expanded = false;
+                        root.showLyrics = false;
+                        root.showVolume = false;
+                        root.showHub = false;
+                        root.showTools = false;
+                        Qt.callLater(audioRecordingVisual.beginEntry);
+                        return;
+                    }
+
+                    if (!root.audioWasActive)
+                        return;
+
+                    root.audioWasActive = false;
+                    root.audioExitActive = true;
+                    root.audioGeometryExitActive = true;
+                    root.audioWidthCollapsing = false;
+                    audioRecordingVisual.beginExit();
+                }
 
                 onIsRecordingChanged: {
                     if (!root.isRecording)
@@ -481,6 +513,12 @@ Variants {
                     root.recordingInfoProgress = root.isRecording ? 1 : 0;
                     root.recordingActionProgress = root.isRecording ? 1 : 0;
                     root.processingContentProgress = root.isFinalizing ? 1 : 0;
+                    root.audioWasActive = root.audioSessionActive;
+                    root.audioExitActive = false;
+                    root.audioGeometryExitActive = false;
+                    root.audioWidthCollapsing = false;
+                    if (root.audioSessionActive)
+                        Qt.callLater(audioRecordingVisual.beginEntry);
                 }
 
                 ParallelAnimation {
@@ -713,6 +751,12 @@ Variants {
                 }
 
                 onTargetWChanged: {
+                    if (root.audioWidthCollapsing) {
+                        wDuration = KeystoneMotion.audioCollapseDuration;
+                        wBezier = KeystoneMotion.shrinkingBezier;
+                        return;
+                    }
+
                     if (root.isHoverWidthMotion(targetW)) {
                         wDuration = KeystoneMotion.hoverDuration;
                         wBezier = KeystoneMotion.hoverBezier;
@@ -724,6 +768,12 @@ Variants {
                     wBezier = isExpanding ? KeystoneMotion.expandingBezier : KeystoneMotion.shrinkingBezier;
                 }
                 onTargetHChanged: {
+                    if (root.audioWidthCollapsing) {
+                        hDuration = KeystoneMotion.audioCollapseDuration;
+                        hBezier = KeystoneMotion.shrinkingBezier;
+                        return;
+                    }
+
                     if (root.isHoverHeightMotion(targetH)) {
                         hDuration = KeystoneMotion.hoverDuration;
                         hBezier = KeystoneMotion.hoverBezier;
@@ -798,7 +848,6 @@ Variants {
                     root.showVolume = false;
                     root.showHub = false;
                     root.showTools = false;
-                    root.showAudio = false;
                 }
 
                 PwObjectTracker { objects: [ Pipewire.defaultAudioSink, Pipewire.defaultAudioSource ] }
@@ -834,7 +883,9 @@ Variants {
                 }
 
                 function triggerSliderOSD(mode) {
-                    if (root.showHub || root.showTools || root.showAudio || root.expanded || root.showLyrics) return
+                    if (root.contentPresentationActive || root.showHub
+                            || root.showTools || root.expanded
+                            || root.showLyrics) return
                     root.sliderMode = mode
                     root.showVolume = true; volHideTimer.restart()
                 }
@@ -875,7 +926,7 @@ Variants {
                     id: keystoneMouseArea  
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true   
-                    enabled: !root.recordingPresentationActive
+                    enabled: !root.contentPresentationActive
                         && !root.isNotifMode
                         && !root.isVolumeMode
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton
@@ -884,12 +935,11 @@ Variants {
                         if (mouse.button === Qt.MiddleButton) {
                             if (root.showHub) root.showHub = false 
                             else if (root.showTools) root.showTools = false 
-                            else if (root.showAudio) root.showAudio = false
                             
                             root.showLyrics = !root.showLyrics
                             if (root.showLyrics) root.expanded = false
                         } else {
-                            if (root.isLyricsMode || root.isHubMode || root.isToolsMode || root.isAudioMode)
+                            if (root.isLyricsMode || root.isHubMode || root.isToolsMode)
                                 return;
 
                             root.expanded = !root.expanded;
@@ -977,7 +1027,7 @@ Variants {
                         width: root.expandedW - 40
                         height: root.expandedH - 40
 
-                        opacity: (!root.recordingPresentationActive
+                        opacity: (!root.contentPresentationActive
                             && root.expanded
                             && !root.isLyricsMode
                             && !root.isHubMode) ? 1 : 0
@@ -1037,36 +1087,6 @@ Variants {
                         }
 
                         onRequestHideKeystone: { root.showTools = false }
-                        onRequestShowAudio: (mode) => { 
-                            root.currentAudioMode = mode
-                            root.showTools = false
-                            root.showAudio = true 
-                        }
-                    }
-
-                    AudioContent {
-                        id: audioWidget
-                        anchors.top: parent.top
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: root.audioW
-                        height: root.audioH
-
-                        active: root.isAudioMode
-                        audioMode: root.currentAudioMode
-                        opacity: root.isAudioMode ? 1 : 0
-                        visible: opacity > 0.01
-                        Behavior on opacity {
-                            NumberAnimation {
-                                duration: Appearance.animation.expressiveEffects.duration
-                                easing.type: Appearance.animation.expressiveEffects.type
-                                easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
-                            }
-                        }
-
-                        onRequestStop: {
-                            root.showAudio = false
-                            toolsWidget.stopAudio() 
-                        }
                     }
                 }
 
@@ -1090,6 +1110,35 @@ Variants {
 
                         mouse.accepted = true;
                     }
+                }
+            }
+
+            AudioRecordingVisual {
+                id: audioRecordingVisual
+
+                anchors.centerIn: root
+                width: root.width
+                height: root.height
+                sessionActive: root.audioPresentationActive
+                recording: AudioRecordingService.isRecording
+                stopping: AudioRecordingService.isStopPending
+                sourceNodeName: AudioRecordingService.sourceNodeName
+                captureSink: AudioRecordingService.captureSink
+                elapsedMs: AudioRecordingService.elapsedMs
+                visible: root.audioPresentationActive
+                    || waveformProgress > 0.01
+                    || controlsProgress > 0.01
+                z: root.z + 3
+
+                onStopRequested: AudioRecordingService.stop()
+                onCollapseRequested: {
+                    root.audioWidthCollapsing = true;
+                    root.audioGeometryExitActive = false;
+                }
+                onExitFinished: {
+                    root.audioExitActive = false;
+                    root.audioGeometryExitActive = false;
+                    root.audioWidthCollapsing = false;
                 }
             }
 
