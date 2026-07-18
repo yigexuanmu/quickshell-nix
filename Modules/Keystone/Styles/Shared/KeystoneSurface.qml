@@ -128,8 +128,8 @@ Variants {
             anchors.bottom: maskContainer.bottom
             anchors.right: maskContainer.right
             width: maskContainer.width
-                + (styleSurface.detached && root.isRecordingMode
-                    ? pillRecordingVisual.satelliteExtent
+                + (styleSurface.detached
+                    ? pillRecordingVisual.satelliteExtent * pillRecordingVisual.satelliteProgress
                     : 0)
         }
 
@@ -259,7 +259,7 @@ Variants {
             anchors.top: parent.top
             anchors.topMargin: styleSurface.topMargin
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.horizontalCenterOffset: styleSurface.detached && root.isRecordingMode
+            anchors.horizontalCenterOffset: styleSurface.detached && root.isRecording
                 ? (root.collapsedW - root.recordingPillW) / 2
                 : 0
             width: root.width + (keystoneWindow.topEdgeCurveWidth * 2)
@@ -267,13 +267,9 @@ Variants {
 
             Behavior on anchors.horizontalCenterOffset {
                 NumberAnimation {
-                    duration: root.isRecordingMode
-                        ? KeystoneMotion.shrinkingDuration
-                        : KeystoneMotion.expandingDuration
-                    easing.type: KeystoneMotion.type
-                    easing.bezierCurve: root.isRecordingMode
-                        ? KeystoneMotion.shrinkingBezier
-                        : KeystoneMotion.expandingBezier
+                    duration: Appearance.animation.expressiveSlowSpatial.duration
+                    easing.type: Appearance.animation.expressiveSlowSpatial.type
+                    easing.bezierCurve: Appearance.animation.expressiveSlowSpatial.bezierCurve
                 }
             }
 
@@ -339,8 +335,8 @@ Variants {
                 property int lyricsW: lyricsWidget.implicitWidth; property int lyricsH: 42 
                 property int expandedW: 540; property int expandedH: 210
                 property int collapsedW: 220; property int collapsedH: 42
-                property int recordingPillW: 160; property int recordingPillH: 48
-                property int recordingBangsW: 220; property int recordingBangsH: 48
+                property int recordingPillW: 160
+                property int recordingBangsW: 220
                 property int toolsW: 480; property int toolsH: 72
                 property int notifW: 380; property int notifH: (NotificationManager.popupList.length * 70) + 20
                 property int volW: 320; property int volH: 64
@@ -355,7 +351,9 @@ Variants {
                     : 12
 
                 property int targetW: isRecordingMode
-                    ? (styleSurface.detached ? recordingPillW : recordingBangsW) :
+                    ? (styleSurface.detached
+                        ? (isFinalizing ? collapsedW : recordingPillW)
+                        : recordingBangsW) :
                     isAudioMode ? audioW :
                     isToolsMode ? toolsW :
                     isHubMode ? hub.implicitWidth : 
@@ -366,7 +364,7 @@ Variants {
                     (collapsedW + (isCollapsedHovered ? 16 : 0))
 
                 property int targetH: isRecordingMode
-                    ? (styleSurface.detached ? recordingPillH : recordingBangsH) :
+                    ? collapsedH :
                         isAudioMode ? audioH :
                         isToolsMode ? toolsH : 
                         isHubMode ? hub.implicitHeight : 
@@ -434,6 +432,12 @@ Variants {
                 }
 
                 onTargetWChanged: {
+                    if (styleSurface.detached && root.isRecordingMode) {
+                        wDuration = Appearance.animation.expressiveSlowSpatial.duration;
+                        wBezier = Appearance.animation.expressiveSlowSpatial.bezierCurve;
+                        return;
+                    }
+
                     if (root.isHoverWidthMotion(targetW)) {
                         wDuration = KeystoneMotion.hoverDuration;
                         wBezier = KeystoneMotion.hoverBezier;

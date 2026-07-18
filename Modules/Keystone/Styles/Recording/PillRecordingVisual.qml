@@ -18,14 +18,17 @@ Item {
     property real mainHeight: 48
     property color surfaceColor: Appearance.colors.colLayer0
 
-    readonly property int effectBleed: 14
-    readonly property int satelliteSize: 48
-    readonly property int satelliteExtent: 72
+    readonly property int effectBleed: 18
+    readonly property real satelliteSize: mainHeight
+    readonly property int satelliteGap: 16
+    readonly property real satelliteExtent: satelliteSize + satelliteGap
     readonly property real mainX: effectBleed + satelliteExtent
     readonly property real mainY: effectBleed
     readonly property real satelliteY: effectBleed + (mainHeight - satelliteSize) / 2
-    readonly property real satelliteX: mainX + 6
-        + (effectBleed - mainX - 6) * satelliteProgress
+    readonly property real satelliteDockedX: mainX + 4
+    readonly property real satelliteRestX: mainX - satelliteSize - satelliteGap
+    readonly property real satelliteX: satelliteDockedX
+        + (satelliteRestX - satelliteDockedX) * satelliteProgress
     readonly property color typeContainerColor: recordingType === "gif"
         ? Appearance.colors.colTertiaryContainer
         : Appearance.colors.colErrorContainer
@@ -76,9 +79,9 @@ Item {
 
     Behavior on satelliteProgress {
         NumberAnimation {
-            duration: Appearance.animation.expressiveDefaultSpatial.duration
-            easing.type: Appearance.animation.expressiveDefaultSpatial.type
-            easing.bezierCurve: Appearance.animation.expressiveDefaultSpatial.bezierCurve
+            duration: Appearance.animation.expressiveSlowSpatial.duration
+            easing.type: Appearance.animation.expressiveSlowSpatial.type
+            easing.bezierCurve: Appearance.animation.expressiveSlowSpatial.bezierCurve
         }
     }
 
@@ -116,8 +119,8 @@ Item {
 
         anchors.fill: parent
         source: rawGooShapes
-        radius: 10
-        samples: 21
+        radius: 14
+        samples: 29
         visible: false
         cached: false
     }
@@ -134,8 +137,8 @@ Item {
         anchors.fill: parent
         source: gooColorField
         maskSource: blurredGooShapes
-        threshold: 0.51
-        spread: 0.025
+        threshold: 0.44
+        spread: 0.06
         cached: false
     }
 
