@@ -22,7 +22,7 @@ Item {
     property color surfaceColor: Appearance.colors.colLayer0
 
     readonly property int effectBleed: 18
-    readonly property real maxMainWidth: 280
+    readonly property real maxMainWidth: 250
     readonly property real maxRightExtent: 70
     readonly property real maxVisualHeight: 52
     readonly property real mainRightX: effectBleed + maxMainWidth
@@ -45,7 +45,7 @@ Item {
     // Reference-video keyframes:
     // idle -> maximum connected hull -> narrow neck -> detached -> settled.
     readonly property real mainLayoutWidth: morphValue(
-        baseMainWidth, 280, 250, 246, settledMainWidth)
+        baseMainWidth, maxMainWidth, 220, 210, settledMainWidth)
     readonly property real mainVisualHeight: morphValue(layoutHeight, 52, 46, 44, 42)
     readonly property real satelliteWidth: satelliteMorphValue(layoutHeight, 60, 56, 54, 52)
     readonly property real satelliteHeight: satelliteMorphValue(layoutHeight, 50, 46, 44, 42)
