@@ -7,8 +7,9 @@ class AudioVisualAnalyzerTest : public QObject {
 
 private slots:
     void appliesMicrophoneNoiseGate();
+    void microphoneSilenceHasNoReleaseTail();
     void preservesSystemTransients();
-    void boundsAndRecoversSystemGain();
+    void usesStableSystemScale();
 };
 
 void AudioVisualAnalyzerTest::appliesMicrophoneNoiseGate()
@@ -21,6 +22,18 @@ void AudioVisualAnalyzerTest::appliesMicrophoneNoiseGate()
     for (int index = 0; index < 5; ++index)
         analyzer.addSample(0.03, 0.10);
     QVERIFY(analyzer.commit(320) > 0.2);
+}
+
+void AudioVisualAnalyzerTest::microphoneSilenceHasNoReleaseTail()
+{
+    AudioVisualAnalyzer analyzer(AudioVisualSource::Microphone);
+    for (int index = 0; index < 5; ++index)
+        analyzer.addSample(0.04, 0.12);
+    QVERIFY(analyzer.commit(160) > 0.0);
+
+    for (int index = 0; index < 5; ++index)
+        analyzer.addSample(0.0, 0.0);
+    QCOMPARE(analyzer.commit(320), 0.0);
 }
 
 void AudioVisualAnalyzerTest::preservesSystemTransients()
@@ -38,30 +51,23 @@ void AudioVisualAnalyzerTest::preservesSystemTransients()
     QVERIFY(transientLevel > steadyLevel + 0.08);
 }
 
-void AudioVisualAnalyzerTest::boundsAndRecoversSystemGain()
+void AudioVisualAnalyzerTest::usesStableSystemScale()
 {
     AudioVisualAnalyzer analyzer(AudioVisualSource::System);
-    qint64 timestamp = 0;
-    for (int window = 0; window < 16; ++window) {
-        for (int sample = 0; sample < 5; ++sample) {
-            const double offset = (window % 3) * 0.004;
-            analyzer.addSample(0.07 + offset, 0.18 + offset);
-        }
-        timestamp += 160;
-        analyzer.commit(timestamp);
-    }
-    const double adaptedGain = analyzer.systemDisplayGain();
-    QVERIFY(adaptedGain > 1.0);
-    QVERIFY(adaptedGain <= 2.0);
+    for (int sample = 0; sample < 5; ++sample)
+        analyzer.addSample(0.07, 0.18);
+    const double first = analyzer.commit(160);
 
-    for (int window = 0; window < 8; ++window) {
+    for (int window = 0; window < 20; ++window) {
         for (int sample = 0; sample < 5; ++sample)
-            analyzer.addSample(0.0, 0.0);
-        timestamp += 160;
-        analyzer.commit(timestamp);
+            analyzer.addSample(0.18, 0.72);
+        analyzer.commit(320 + window * 160);
     }
-    QVERIFY(analyzer.systemDisplayGain() < adaptedGain);
-    QVERIFY(analyzer.systemDisplayGain() >= 0.75);
+
+    for (int sample = 0; sample < 5; ++sample)
+        analyzer.addSample(0.07, 0.18);
+    const double afterLoudHistory = analyzer.commit(3520);
+    QCOMPARE(afterLoudHistory, first);
 }
 
 QTEST_MAIN(AudioVisualAnalyzerTest)

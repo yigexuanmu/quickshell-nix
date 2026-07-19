@@ -20,8 +20,6 @@ constexpr AnalysisProfile kSystemProfile{
 constexpr AnalysisProfile kMicrophoneProfile{
     0.70, 0.20, 0.10, -50.0, -10.0, 0.95,
 };
-constexpr qint64 kAdaptiveWindowMs = 3000;
-constexpr qint64 kVisualIntervalMs = 160;
 
 double clamp01(double value)
 {
@@ -68,15 +66,6 @@ double softCompressPeak(double value)
     return knee + (0.92 - knee) * curve;
 }
 
-double smoothedValue(double current, double target, qint64 elapsedMs,
-                     double durationMs)
-{
-    const double alpha =
-        1.0 - std::exp(-static_cast<double>(std::max<qint64>(1, elapsedMs))
-                       / std::max(1.0, durationMs));
-    return current + (target - current) * alpha;
-}
-
 } // namespace
 
 AudioVisualAnalyzer::AudioVisualAnalyzer(AudioVisualSource source)
@@ -89,11 +78,6 @@ void AudioVisualAnalyzer::reset(AudioVisualSource source)
     m_source = source;
     m_windowRms.clear();
     m_windowPeaks.clear();
-    m_systemHistory.clear();
-    m_microphoneLevel = 0.0;
-    m_systemDisplayGain = 1.0;
-    m_systemLowReference = 0.0;
-    m_lastCommitAt = 0;
 }
 
 void AudioVisualAnalyzer::addSample(double rms, double peak, bool available)
@@ -109,24 +93,8 @@ void AudioVisualAnalyzer::addSample(double rms, double peak, bool available)
 
 double AudioVisualAnalyzer::commit(qint64 timestampMs)
 {
-    const double summarized = summarizeWindow();
-    const qint64 elapsed = m_lastCommitAt > 0
-        ? std::clamp(timestampMs - m_lastCommitAt,
-                     static_cast<qint64>(1), static_cast<qint64>(500))
-        : kVisualIntervalMs;
-    m_lastCommitAt = timestampMs;
-
-    if (m_source == AudioVisualSource::System)
-        return adaptSystemEnergy(summarized, timestampMs, elapsed);
-
-    const double alpha = summarized > m_microphoneLevel ? 0.48 : 0.22;
-    m_microphoneLevel += (summarized - m_microphoneLevel) * alpha;
-    return clamp01(m_microphoneLevel);
-}
-
-double AudioVisualAnalyzer::systemDisplayGain() const
-{
-    return m_systemDisplayGain;
+    Q_UNUSED(timestampMs);
+    return summarizeWindow();
 }
 
 double AudioVisualAnalyzer::summarizeWindow()
@@ -159,52 +127,4 @@ double AudioVisualAnalyzer::summarizeWindow()
     return clamp01(mappedRms * profile.rmsWeight
                    + mappedP90 * profile.p90Weight
                    + mappedPeak * profile.peakWeight);
-}
-
-double AudioVisualAnalyzer::adaptSystemEnergy(double value,
-                                              qint64 timestampMs,
-                                              qint64 elapsedMs)
-{
-    m_systemHistory.push_back({timestampMs, value});
-    while (!m_systemHistory.empty()
-           && timestampMs - m_systemHistory.front().timestampMs
-               > kAdaptiveWindowMs) {
-        m_systemHistory.pop_front();
-    }
-
-    if (m_systemHistory.size() < 8)
-        return value;
-
-    std::vector<double> energies;
-    energies.reserve(m_systemHistory.size());
-    for (const TimedEnergy &sample : m_systemHistory)
-        energies.push_back(sample.value);
-    const double low = percentile(energies, 0.20);
-    const double high = percentile(energies, 0.90);
-
-    if (value <= 0.035 || high <= 0.08) {
-        m_systemDisplayGain = smoothedValue(
-            m_systemDisplayGain, 1.0, elapsedMs, 2000.0);
-        m_systemLowReference = smoothedValue(
-            m_systemLowReference, 0.0, elapsedMs, 2000.0);
-        return clamp01(value * m_systemDisplayGain);
-    }
-
-    const double dynamicRange = std::max(0.001, high - low);
-    const double targetGain =
-        std::clamp(0.48 / std::max(0.24, dynamicRange), 0.75, 2.0);
-    const double gainDuration =
-        targetGain < m_systemDisplayGain ? 250.0 : 1200.0;
-    const double lowDuration =
-        low > m_systemLowReference ? 250.0 : 1200.0;
-    m_systemDisplayGain = smoothedValue(
-        m_systemDisplayGain, targetGain, elapsedMs, gainDuration);
-    m_systemLowReference = smoothedValue(
-        m_systemLowReference, low, elapsedMs, lowDuration);
-
-    const double displayFloor =
-        std::clamp(m_systemLowReference * 0.5, 0.06, 0.32);
-    const double adapted = displayFloor
-        + (value - m_systemLowReference) * m_systemDisplayGain;
-    return clamp01(adapted * 0.85 + value * 0.15);
 }
