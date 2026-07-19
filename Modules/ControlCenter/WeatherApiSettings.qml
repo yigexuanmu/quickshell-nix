@@ -58,10 +58,16 @@ StyledFlickable {
         target: WeatherMapPlugin
 
         function onCredentialOperationFinished(operation, success, message) {
+            if (operation !== "openweather_store"
+                && operation !== "openweather_clear") {
+                return
+            }
+
             root.feedbackError = !success
             root.feedbackText = message
             if (success
-                && (operation === "store" || operation === "clear")) {
+                && (operation === "openweather_store"
+                    || operation === "openweather_clear")) {
                 apiKeyField.clear()
                 root.revealApiKey = false
                 root.notifyMainShell()
@@ -163,7 +169,7 @@ StyledFlickable {
 
                         Text {
                             Layout.fillWidth: true
-                            text: "用于温度和降水图层"
+                            text: "用于天气数据覆盖层"
                             color: Appearance.colors.colOnSurfaceVariant
                             font.family: Sizes.fontFamily
                             font.pixelSize: 12
@@ -422,6 +428,10 @@ StyledFlickable {
             }
         }
 
+        MapTilerApiSettingsCard {
+            Layout.fillWidth: true
+        }
+
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: helpContent.implicitHeight + 32
@@ -444,7 +454,7 @@ StyledFlickable {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "AQI 使用 Open-Meteo，无需此密钥。已保存的密钥不会显示在界面中。"
+                    text: "密钥仅保存在系统密钥环中，不会写入项目配置或显示在界面中。"
                     color: Appearance.colors.colOnSurfaceVariant
                     font.family: Sizes.fontFamily
                     font.pixelSize: 12

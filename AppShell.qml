@@ -95,5 +95,9 @@ Item {
             WeatherMapPlugin.reloadCredentials()
             return "RELOADING"
         }
+
+        function mapTilerStatus(): string {
+            return WeatherMapPlugin.mapTilerStatus
+        }
     }
 }

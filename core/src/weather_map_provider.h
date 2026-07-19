@@ -16,11 +16,13 @@ class WeatherMapProvider : public QObject {
 
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(bool apiConfigured READ apiConfigured NOTIFY apiConfiguredChanged)
+    Q_PROPERTY(bool mapTilerConfigured READ mapTilerConfigured NOTIFY mapTilerConfiguredChanged)
     Q_PROPERTY(bool credentialsReady READ credentialsReady NOTIFY credentialsReadyChanged)
     Q_PROPERTY(bool credentialBusy READ credentialBusy NOTIFY credentialBusyChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY statusChanged)
+    Q_PROPERTY(QString mapTilerStatus READ mapTilerStatus NOTIFY mapTilerStatusChanged)
 
 public:
     explicit WeatherMapProvider(QObject *parent = nullptr);
@@ -28,11 +30,13 @@ public:
     bool active() const;
     void setActive(bool active);
     bool apiConfigured() const;
+    bool mapTilerConfigured() const;
     bool credentialsReady() const;
     bool credentialBusy() const;
     bool busy() const;
     QString status() const;
     QString errorMessage() const;
+    QString mapTilerStatus() const;
 
     void beginViewport(int generation);
     QVariantMap requestTile(
@@ -52,14 +56,19 @@ public:
     );
     QVariantMap storeApiKey(const QString &apiKey);
     QVariantMap clearApiKey();
+    QVariantMap storeMapTilerApiKey(const QString &apiKey);
+    QVariantMap clearMapTilerApiKey();
     void reloadCredentials();
 
 signals:
     void activeChanged();
     void apiConfiguredChanged();
+    void mapTilerConfiguredChanged();
     void credentialsReadyChanged();
     void credentialBusyChanged();
     void apiKeyChanged();
+    void mapTilerApiKeyChanged();
+    void mapTilerStatusChanged();
     void credentialOperationFinished(
         const QString &operation,
         bool success,
@@ -161,9 +170,11 @@ private:
     QHash<QString, QList<GridSubscriber>> m_gridSubscribers;
     QSet<QString> m_pendingKeys;
     QByteArray m_apiKey;
+    QByteArray m_mapTilerApiKey;
     QString m_cacheRoot;
     QString m_status = QStringLiteral("idle");
     QString m_errorMessage;
+    QString m_mapTilerStatus = QStringLiteral("loading_credentials");
     int m_generation = 0;
     bool m_active = false;
     bool m_busy = false;
@@ -232,12 +243,19 @@ private:
     void notifySuccess(const TileTask &task, bool stale);
     void notifyFailure(const TileTask &task, const QString &errorCode);
     void pruneObsoleteQueue();
-    void loadApiKey(bool forceRefresh = false);
+    void loadCredentials(bool forceRefresh = false);
+    void loadOpenWeatherApiKey(bool forceRefresh);
+    void loadMapTilerApiKey(bool forceRefresh);
     void finishCredentialOperation();
     void replaceApiKey(const QByteArray &apiKey, bool forceRefresh = false);
+    void replaceMapTilerApiKey(
+        const QByteArray &apiKey,
+        bool forceRefresh = false
+    );
     void cancelWeatherRequests();
     void setCredentialsReady(bool ready);
     void setCredentialBusy(bool busy);
+    void setMapTilerStatus(const QString &status);
     void updateBusy();
     void setStatus(const QString &status, const QString &message = {});
 

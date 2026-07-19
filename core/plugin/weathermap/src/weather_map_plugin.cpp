@@ -18,6 +18,12 @@ WeatherMapPlugin::WeatherMapPlugin(QObject *parent)
     );
     connect(
         &m_provider,
+        &WeatherMapProvider::mapTilerConfiguredChanged,
+        this,
+        &WeatherMapPlugin::mapTilerConfiguredChanged
+    );
+    connect(
+        &m_provider,
         &WeatherMapProvider::credentialsReadyChanged,
         this,
         &WeatherMapPlugin::credentialsReadyChanged
@@ -33,6 +39,18 @@ WeatherMapPlugin::WeatherMapPlugin(QObject *parent)
         &WeatherMapProvider::apiKeyChanged,
         this,
         &WeatherMapPlugin::apiKeyChanged
+    );
+    connect(
+        &m_provider,
+        &WeatherMapProvider::mapTilerApiKeyChanged,
+        this,
+        &WeatherMapPlugin::mapTilerApiKeyChanged
+    );
+    connect(
+        &m_provider,
+        &WeatherMapProvider::mapTilerStatusChanged,
+        this,
+        &WeatherMapPlugin::mapTilerStatusChanged
     );
     connect(
         &m_provider,
@@ -99,6 +117,11 @@ bool WeatherMapPlugin::apiConfigured() const
     return m_provider.apiConfigured();
 }
 
+bool WeatherMapPlugin::mapTilerConfigured() const
+{
+    return m_provider.mapTilerConfigured();
+}
+
 bool WeatherMapPlugin::credentialsReady() const
 {
     return m_provider.credentialsReady();
@@ -122,6 +145,11 @@ QString WeatherMapPlugin::status() const
 QString WeatherMapPlugin::errorMessage() const
 {
     return m_provider.errorMessage();
+}
+
+QString WeatherMapPlugin::mapTilerStatus() const
+{
+    return m_provider.mapTilerStatus();
 }
 
 void WeatherMapPlugin::beginViewport(int generation)
@@ -173,6 +201,16 @@ QVariantMap WeatherMapPlugin::storeApiKey(const QString &apiKey)
 QVariantMap WeatherMapPlugin::clearApiKey()
 {
     return m_provider.clearApiKey();
+}
+
+QVariantMap WeatherMapPlugin::storeMapTilerApiKey(const QString &apiKey)
+{
+    return m_provider.storeMapTilerApiKey(apiKey);
+}
+
+QVariantMap WeatherMapPlugin::clearMapTilerApiKey()
+{
+    return m_provider.clearMapTilerApiKey();
 }
 
 void WeatherMapPlugin::reloadCredentials()

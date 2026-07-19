@@ -25,7 +25,8 @@ constexpr auto kOpenWeatherTileHost = "https://tile.openweathermap.org";
 constexpr auto kOpenMeteoAirQualityHost = "https://air-quality-api.open-meteo.com";
 constexpr auto kUserAgent = "ClavisWeatherMap/1.0 (native Quickshell weather map)";
 constexpr auto kKeychainService = "Clavis.Quickshell.WeatherMap";
-constexpr auto kKeychainEntry = "openweather-api-key";
+constexpr auto kOpenWeatherKeychainEntry = "openweather-api-key";
+constexpr auto kMapTilerKeychainEntry = "maptiler-api-key";
 
 qint64 cacheControlMaxAge(const QByteArray &header)
 {
@@ -57,7 +58,7 @@ WeatherMapProvider::WeatherMapProvider(QObject *parent)
     QDir().mkpath(m_cacheRoot);
 
     m_status = QStringLiteral("loading_credentials");
-    loadApiKey();
+    loadCredentials();
 }
 
 bool WeatherMapProvider::active() const
@@ -97,6 +98,11 @@ bool WeatherMapProvider::apiConfigured() const
     return !m_apiKey.isEmpty();
 }
 
+bool WeatherMapProvider::mapTilerConfigured() const
+{
+    return !m_mapTilerApiKey.isEmpty();
+}
+
 bool WeatherMapProvider::credentialsReady() const
 {
     return m_credentialsReady;
@@ -120,6 +126,11 @@ QString WeatherMapProvider::status() const
 QString WeatherMapProvider::errorMessage() const
 {
     return m_errorMessage;
+}
+
+QString WeatherMapProvider::mapTilerStatus() const
+{
+    return m_mapTilerStatus;
 }
 
 void WeatherMapProvider::beginViewport(int generation)
@@ -329,7 +340,7 @@ QVariantMap WeatherMapProvider::storeApiKey(const QString &apiKey)
         QString::fromLatin1(kKeychainService),
         this
     );
-    job->setKey(QString::fromLatin1(kKeychainEntry));
+    job->setKey(QString::fromLatin1(kOpenWeatherKeychainEntry));
     job->setTextData(normalized);
     job->setInsecureFallback(false);
     connect(
@@ -340,9 +351,9 @@ QVariantMap WeatherMapProvider::storeApiKey(const QString &apiKey)
             if (finishedJob->error() != QKeychain::NoError) {
                 finishCredentialOperation();
                 emit credentialOperationFinished(
-                    QStringLiteral("store"),
+                    QStringLiteral("openweather_store"),
                     false,
-                    QStringLiteral("无法将密钥写入系统密钥环")
+                    QStringLiteral("无法保存 OpenWeather 密钥")
                 );
                 return;
             }
@@ -352,9 +363,9 @@ QVariantMap WeatherMapProvider::storeApiKey(const QString &apiKey)
             replaceApiKey(normalized.toUtf8(), true);
             finishCredentialOperation();
             emit credentialOperationFinished(
-                QStringLiteral("store"),
+                QStringLiteral("openweather_store"),
                 true,
-                QStringLiteral("密钥已安全保存并立即生效")
+                QStringLiteral("OpenWeather 密钥已保存")
             );
         }
     );
@@ -389,7 +400,7 @@ QVariantMap WeatherMapProvider::clearApiKey()
         QString::fromLatin1(kKeychainService),
         this
     );
-    job->setKey(QString::fromLatin1(kKeychainEntry));
+    job->setKey(QString::fromLatin1(kOpenWeatherKeychainEntry));
     job->setInsecureFallback(false);
     connect(
         job,
@@ -400,9 +411,9 @@ QVariantMap WeatherMapProvider::clearApiKey()
                 && finishedJob->error() != QKeychain::EntryNotFound) {
                 finishCredentialOperation();
                 emit credentialOperationFinished(
-                    QStringLiteral("clear"),
+                    QStringLiteral("openweather_clear"),
                     false,
-                    QStringLiteral("无法从系统密钥环清除密钥")
+                    QStringLiteral("无法清除 OpenWeather 密钥")
                 );
                 return;
             }
@@ -415,9 +426,140 @@ QVariantMap WeatherMapProvider::clearApiKey()
             replaceApiKey({}, true);
             finishCredentialOperation();
             emit credentialOperationFinished(
-                QStringLiteral("clear"),
+                QStringLiteral("openweather_clear"),
                 true,
-                QStringLiteral("已从系统密钥环清除密钥")
+                QStringLiteral("OpenWeather 密钥已清除")
+            );
+        }
+    );
+    setCredentialBusy(true);
+    job->start();
+
+    result.insert(QStringLiteral("ok"), true);
+    result.insert(QStringLiteral("pending"), true);
+    result.insert(
+        QStringLiteral("message"),
+        QStringLiteral("正在从系统密钥环清除密钥")
+    );
+    return result;
+}
+
+QVariantMap WeatherMapProvider::storeMapTilerApiKey(const QString &apiKey)
+{
+    QVariantMap result {
+        { QStringLiteral("ok"), false },
+        { QStringLiteral("pending"), false }
+    };
+
+    const QString normalized = apiKey.trimmed();
+    if (!validApiKey(normalized)) {
+        result.insert(
+            QStringLiteral("message"),
+            QStringLiteral("请输入有效的 MapTiler API key")
+        );
+        return result;
+    }
+
+    if (m_credentialBusy) {
+        result.insert(
+            QStringLiteral("message"),
+            QStringLiteral("系统密钥环正在处理另一项操作")
+        );
+        return result;
+    }
+
+    auto *job = new QKeychain::WritePasswordJob(
+        QString::fromLatin1(kKeychainService),
+        this
+    );
+    job->setKey(QString::fromLatin1(kMapTilerKeychainEntry));
+    job->setTextData(normalized);
+    job->setInsecureFallback(false);
+    connect(
+        job,
+        &QKeychain::Job::finished,
+        this,
+        [this, normalized](QKeychain::Job *finishedJob) {
+            if (finishedJob->error() != QKeychain::NoError) {
+                setMapTilerStatus(QStringLiteral("keychain_error"));
+                finishCredentialOperation();
+                emit credentialOperationFinished(
+                    QStringLiteral("maptiler_store"),
+                    false,
+                    QStringLiteral("无法保存 MapTiler 密钥")
+                );
+                return;
+            }
+
+            setCredentialsReady(true);
+            setMapTilerStatus(QStringLiteral("ready"));
+            replaceMapTilerApiKey(normalized.toUtf8(), true);
+            finishCredentialOperation();
+            emit credentialOperationFinished(
+                QStringLiteral("maptiler_store"),
+                true,
+                QStringLiteral("MapTiler 密钥已保存")
+            );
+        }
+    );
+    setCredentialBusy(true);
+    job->start();
+
+    result.insert(QStringLiteral("ok"), true);
+    result.insert(QStringLiteral("pending"), true);
+    result.insert(
+        QStringLiteral("message"),
+        QStringLiteral("正在安全保存到系统密钥环")
+    );
+    return result;
+}
+
+QVariantMap WeatherMapProvider::clearMapTilerApiKey()
+{
+    QVariantMap result {
+        { QStringLiteral("ok"), false },
+        { QStringLiteral("pending"), false }
+    };
+
+    if (m_credentialBusy) {
+        result.insert(
+            QStringLiteral("message"),
+            QStringLiteral("系统密钥环正在处理另一项操作")
+        );
+        return result;
+    }
+
+    auto *job = new QKeychain::DeletePasswordJob(
+        QString::fromLatin1(kKeychainService),
+        this
+    );
+    job->setKey(QString::fromLatin1(kMapTilerKeychainEntry));
+    job->setInsecureFallback(false);
+    connect(
+        job,
+        &QKeychain::Job::finished,
+        this,
+        [this](QKeychain::Job *finishedJob) {
+            if (finishedJob->error() != QKeychain::NoError
+                && finishedJob->error() != QKeychain::EntryNotFound) {
+                setMapTilerStatus(QStringLiteral("keychain_error"));
+                finishCredentialOperation();
+                emit credentialOperationFinished(
+                    QStringLiteral("maptiler_clear"),
+                    false,
+                    QStringLiteral("无法清除 MapTiler 密钥")
+                );
+                return;
+            }
+
+            setCredentialsReady(true);
+            setMapTilerStatus(QStringLiteral("not_configured"));
+            replaceMapTilerApiKey({}, true);
+            finishCredentialOperation();
+            emit credentialOperationFinished(
+                QStringLiteral("maptiler_clear"),
+                true,
+                QStringLiteral("MapTiler 密钥已清除")
             );
         }
     );
@@ -439,7 +581,7 @@ void WeatherMapProvider::reloadCredentials()
         m_reloadCredentialsPending = true;
         return;
     }
-    loadApiKey(true);
+    loadCredentials(true);
 }
 
 int WeatherMapProvider::wrappedX(int x, int zoom)
@@ -1082,13 +1224,20 @@ void WeatherMapProvider::pruneObsoleteQueue()
     updateBusy();
 }
 
-void WeatherMapProvider::loadApiKey(bool forceRefresh)
+void WeatherMapProvider::loadCredentials(bool forceRefresh)
+{
+    setCredentialBusy(true);
+    setMapTilerStatus(QStringLiteral("loading_credentials"));
+    loadOpenWeatherApiKey(forceRefresh);
+}
+
+void WeatherMapProvider::loadOpenWeatherApiKey(bool forceRefresh)
 {
     auto *job = new QKeychain::ReadPasswordJob(
         QString::fromLatin1(kKeychainService),
         this
     );
-    job->setKey(QString::fromLatin1(kKeychainEntry));
+    job->setKey(QString::fromLatin1(kOpenWeatherKeychainEntry));
     job->setInsecureFallback(false);
     connect(
         job,
@@ -1106,7 +1255,7 @@ void WeatherMapProvider::loadApiKey(bool forceRefresh)
                     QStringLiteral("not_configured"),
                     QStringLiteral("地图服务未配置")
                 );
-                finishCredentialOperation();
+                loadMapTilerApiKey(forceRefresh);
                 return;
             }
 
@@ -1116,7 +1265,7 @@ void WeatherMapProvider::loadApiKey(bool forceRefresh)
                     QStringLiteral("keychain_error"),
                     QStringLiteral("无法访问系统密钥环")
                 );
-                finishCredentialOperation();
+                loadMapTilerApiKey(forceRefresh);
                 return;
             }
 
@@ -1127,16 +1276,59 @@ void WeatherMapProvider::loadApiKey(bool forceRefresh)
                     QStringLiteral("not_configured"),
                     QStringLiteral("地图服务未配置")
                 );
-                finishCredentialOperation();
+                loadMapTilerApiKey(forceRefresh);
                 return;
             }
 
             setStatus(QStringLiteral("idle"));
             replaceApiKey(storedKey.toUtf8(), forceRefresh);
+            loadMapTilerApiKey(forceRefresh);
+        }
+    );
+    job->start();
+}
+
+void WeatherMapProvider::loadMapTilerApiKey(bool forceRefresh)
+{
+    auto *job = new QKeychain::ReadPasswordJob(
+        QString::fromLatin1(kKeychainService),
+        this
+    );
+    job->setKey(QString::fromLatin1(kMapTilerKeychainEntry));
+    job->setInsecureFallback(false);
+    connect(
+        job,
+        &QKeychain::Job::finished,
+        this,
+        [this, forceRefresh](QKeychain::Job *finishedJob) {
+            const auto *readJob = static_cast<QKeychain::ReadPasswordJob *>(
+                finishedJob
+            );
+
+            if (finishedJob->error() == QKeychain::EntryNotFound) {
+                replaceMapTilerApiKey({}, forceRefresh);
+                setMapTilerStatus(QStringLiteral("not_configured"));
+            } else if (finishedJob->error() != QKeychain::NoError) {
+                replaceMapTilerApiKey({}, forceRefresh);
+                setMapTilerStatus(QStringLiteral("keychain_error"));
+            } else {
+                const QString storedKey = readJob->textData().trimmed();
+                if (validApiKey(storedKey)) {
+                    replaceMapTilerApiKey(
+                        storedKey.toUtf8(),
+                        forceRefresh
+                    );
+                    setMapTilerStatus(QStringLiteral("ready"));
+                } else {
+                    replaceMapTilerApiKey({}, forceRefresh);
+                    setMapTilerStatus(QStringLiteral("not_configured"));
+                }
+            }
+
+            setCredentialsReady(true);
             finishCredentialOperation();
         }
     );
-    setCredentialBusy(true);
     job->start();
 }
 
@@ -1147,7 +1339,7 @@ void WeatherMapProvider::finishCredentialOperation()
         return;
 
     m_reloadCredentialsPending = false;
-    loadApiKey(true);
+    loadCredentials(true);
 }
 
 void WeatherMapProvider::replaceApiKey(
@@ -1164,6 +1356,21 @@ void WeatherMapProvider::replaceApiKey(
     if (wasConfigured != apiConfigured())
         emit apiConfiguredChanged();
     emit apiKeyChanged();
+}
+
+void WeatherMapProvider::replaceMapTilerApiKey(
+    const QByteArray &apiKey,
+    bool forceRefresh
+)
+{
+    if (m_mapTilerApiKey == apiKey && !forceRefresh)
+        return;
+
+    const bool wasConfigured = mapTilerConfigured();
+    m_mapTilerApiKey = apiKey;
+    if (wasConfigured != mapTilerConfigured())
+        emit mapTilerConfiguredChanged();
+    emit mapTilerApiKeyChanged();
 }
 
 void WeatherMapProvider::cancelWeatherRequests()
@@ -1213,6 +1420,14 @@ void WeatherMapProvider::setCredentialBusy(bool busy)
         return;
     m_credentialBusy = busy;
     emit credentialBusyChanged();
+}
+
+void WeatherMapProvider::setMapTilerStatus(const QString &status)
+{
+    if (m_mapTilerStatus == status)
+        return;
+    m_mapTilerStatus = status;
+    emit mapTilerStatusChanged();
 }
 
 void WeatherMapProvider::updateBusy()
