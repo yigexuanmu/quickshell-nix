@@ -9,8 +9,8 @@ Item {
     property bool sourceAvailable: false
     property double amplitude: 0
     property double sampleTimestampMs: 0
-    property int activeBars: 22
-    property int waitingBars: 5
+    property int activeBars: 19
+    property int waitingBars: 8
     property real barWidth: 3
     property real barGap: 3
     property real minimumHeight: 2
@@ -21,9 +21,16 @@ Item {
 
     property var _levels: []
     property var _bornAt: []
+    property bool _hasConvertingSample: false
+    property double _convertingLevel: 0
+    property double _convertingBornAt: 0
     property double _lastSourceTimestamp: 0
     property double _lastPushAt: 0
     readonly property int _sampleInterval: 160
+    readonly property int _totalBars: activeBars + waitingBars
+
+    implicitWidth: _totalBars * (barWidth + barGap) - barGap
+    implicitHeight: maximumHeight
 
     function clamp01(value) {
         return Math.max(0, Math.min(1, Number(value) || 0));
@@ -32,6 +39,9 @@ Item {
     function resetHistory() {
         _levels = [];
         _bornAt = [];
+        _hasConvertingSample = false;
+        _convertingLevel = 0;
+        _convertingBornAt = 0;
         _lastSourceTimestamp = 0;
         _lastPushAt = Date.now();
         waveformCanvas.requestPaint();
@@ -39,21 +49,25 @@ Item {
 
     function pushSample(value, timestamp) {
         const now = Date.now();
-        if (_levels.length >= activeBars) {
-            _levels.shift();
-            _bornAt.shift();
+        if (_hasConvertingSample) {
+            if (_levels.length >= activeBars) {
+                _levels.shift();
+                _bornAt.shift();
+            }
+            _levels.push(_convertingLevel);
+            _bornAt.push(_convertingBornAt);
         }
-        _levels.push(sourceAvailable ? clamp01(value) : 0);
-        _bornAt.push(now + Math.max(0, _sampleInterval - 90));
+        _convertingLevel = sourceAvailable ? clamp01(value) : 0;
+        _convertingBornAt = now;
+        _hasConvertingSample = true;
         _lastSourceTimestamp = timestamp;
         _lastPushAt = now;
         waveformCanvas.requestPaint();
     }
 
-    function animatedHeight(slot, now) {
+    function animatedHeightFor(level, bornAt, now) {
         const targetHeight = minimumHeight
-            + (_levels[slot] || 0) * (maximumHeight - minimumHeight);
-        const bornAt = _bornAt[slot] || 0;
+            + clamp01(level) * (maximumHeight - minimumHeight);
         const age = Math.max(0, now - bornAt);
         if (bornAt <= 0)
             return minimumHeight;
@@ -72,6 +86,25 @@ Item {
         return targetHeight;
     }
 
+    function mixedColor(fromColor, toColor, progress) {
+        const amount = clamp01(progress);
+        return Qt.rgba(
+            fromColor.r + (toColor.r - fromColor.r) * amount,
+            fromColor.g + (toColor.g - fromColor.g) * amount,
+            fromColor.b + (toColor.b - fromColor.b) * amount,
+            fromColor.a + (toColor.a - fromColor.a) * amount
+        );
+    }
+
+    function paintBar(context, x, barHeight, fillColor, centerY) {
+        const y = centerY - barHeight / 2;
+        const radius = Math.min(barWidth / 2, barHeight / 2);
+        context.fillStyle = fillColor;
+        context.beginPath();
+        context.roundedRect(x, y, barWidth, barHeight, radius, radius);
+        context.fill();
+    }
+
     onSampleTimestampMsChanged: {
         if (active && acceptSamples
                 && sampleTimestampMs > _lastSourceTimestamp) {
@@ -83,6 +116,7 @@ Item {
             resetHistory();
     }
     onActiveBarsChanged: resetHistory()
+    onWaitingBarsChanged: resetHistory()
     Component.onCompleted: resetHistory()
 
     FrameAnimation {
@@ -103,40 +137,57 @@ Item {
             context.reset();
             const now = Date.now();
             const pitch = root.barWidth + root.barGap;
-            const activeWidth = root.activeBars * pitch - root.barGap;
+            const trackWidth = root._totalBars * pitch - root.barGap;
             const centerY = height / 2;
-            const phase = Math.max(
-                0,
-                Math.min(1, (now - root._lastPushAt) / root._sampleInterval)
-            );
+            const phase = root._hasConvertingSample
+                ? Math.max(
+                    0,
+                    Math.min(1, (now - root._lastPushAt)
+                        / root._sampleInterval)
+                )
+                : 0;
 
             context.save();
             context.beginPath();
-            context.rect(0, 0, activeWidth, height);
+            context.rect(0, 0, trackWidth, height);
             context.clip();
-            context.fillStyle = root.activeColor;
+
             const firstSlot = root.activeBars - root._levels.length;
             for (let slot = 0; slot < root._levels.length; ++slot) {
-                const barHeight = root.animatedHeight(slot, now);
-                const x = (firstSlot + slot + 1 - phase) * pitch;
-                const y = centerY - barHeight / 2;
-                const radius = Math.min(root.barWidth / 2, barHeight / 2);
-                context.beginPath();
-                context.roundedRect(x, y, root.barWidth, barHeight, radius, radius);
-                context.fill();
+                const barHeight = root.animatedHeightFor(
+                    root._levels[slot], root._bornAt[slot], now);
+                const x = (firstSlot + slot - phase) * pitch;
+                root.paintBar(
+                    context, x, barHeight, root.activeColor, centerY);
+            }
+
+            if (root._hasConvertingSample) {
+                const colorProgress = 1 - Math.pow(1 - phase, 3);
+                const convertingColor = root.mixedColor(
+                    root.waitingColor, root.activeColor, colorProgress);
+                const convertingHeight = root.animatedHeightFor(
+                    root._convertingLevel, root._convertingBornAt, now);
+                const convertingX = (root.activeBars - phase) * pitch;
+                root.paintBar(context, convertingX, convertingHeight,
+                    convertingColor, centerY);
+
+                for (let slot = 1; slot < root.waitingBars; ++slot) {
+                    const x = (root.activeBars + slot - phase) * pitch;
+                    root.paintBar(context, x, root.minimumHeight,
+                        root.waitingColor, centerY);
+                }
+
+                const enteringX = (root._totalBars - phase) * pitch;
+                root.paintBar(context, enteringX, root.minimumHeight,
+                    root.waitingColor, centerY);
+            } else {
+                for (let slot = 0; slot < root.waitingBars; ++slot) {
+                    const x = (root.activeBars + slot) * pitch;
+                    root.paintBar(context, x, root.minimumHeight,
+                        root.waitingColor, centerY);
+                }
             }
             context.restore();
-
-            context.fillStyle = root.waitingColor;
-            for (let slot = 0; slot < root.waitingBars; ++slot) {
-                const x = activeWidth + root.barGap + slot * pitch;
-                const y = centerY - root.minimumHeight / 2;
-                const radius = root.minimumHeight / 2;
-                context.beginPath();
-                context.roundedRect(
-                    x, y, root.barWidth, root.minimumHeight, radius, radius);
-                context.fill();
-            }
         }
     }
 }

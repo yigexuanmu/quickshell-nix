@@ -34,7 +34,6 @@ Item {
         exitSequence.stop();
         entryAnimation.stop();
         waveform.resetHistory();
-        root.contentProgress = 0;
         entryAnimation.restart();
     }
 

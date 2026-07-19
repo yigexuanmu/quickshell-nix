@@ -304,6 +304,7 @@ Variants {
                 property bool showHub: false
                 property bool showTools: false 
                 property int hubTabIndex: 0
+                property bool componentReady: false
                 property bool pillStopFusionMinimumActive: false
                 readonly property bool backendFinalizing: RecordingService.isFinalizing
                 readonly property bool stopPresentationActive: RecordingService.isStopPending
@@ -412,7 +413,8 @@ Variants {
                         root.showVolume = false;
                         root.showHub = false;
                         root.showTools = false;
-                        Qt.callLater(audioRecordingVisual.beginEntry);
+                        if (root.componentReady)
+                            audioRecordingVisual.beginEntry();
                         return;
                     }
 
@@ -488,6 +490,7 @@ Variants {
                 }
 
                 Component.onCompleted: {
+                    root.componentReady = true;
                     recordingContentIn.stop();
                     recordingPresentationOut.stop();
                     recordingActionOut.stop();
@@ -508,7 +511,7 @@ Variants {
                         ? root.audioPhaseExpanded
                         : root.audioPhaseHidden;
                     if (root.audioSessionActive)
-                        Qt.callLater(audioRecordingVisual.beginEntry);
+                        audioRecordingVisual.beginEntry();
                 }
 
                 ParallelAnimation {
