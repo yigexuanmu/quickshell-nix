@@ -69,12 +69,12 @@ Item {
 
             AudioWaveform {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 32
+                Layout.preferredHeight: 40
                 active: root.sessionActive
                 acceptSamples: root.recording
                 sourceAvailable: levelProvider.available
-                amplitude: levelProvider.normalizedAmplitude
-                sampleTimestampMs: levelProvider.timestampMs
+                amplitude: levelProvider.visualAmplitude
+                sampleTimestampMs: levelProvider.visualTimestampMs
             }
 
             Text {

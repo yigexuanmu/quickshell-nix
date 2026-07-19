@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio_level_collector.h"
+#include "audio_visual_analyzer.h"
 
 #include <QObject>
 #include <QTimer>
@@ -21,6 +22,10 @@ class AudioLevelProvider : public QObject {
     Q_PROPERTY(double peak READ peak NOTIFY valuesChanged)
     Q_PROPERTY(double normalizedAmplitude READ normalizedAmplitude
                    NOTIFY valuesChanged)
+    Q_PROPERTY(qint64 visualTimestampMs READ visualTimestampMs
+                   NOTIFY visualSampleChanged)
+    Q_PROPERTY(double visualAmplitude READ visualAmplitude
+                   NOTIFY visualSampleChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY valuesChanged)
 
 public:
@@ -39,6 +44,8 @@ public:
     double rms() const;
     double peak() const;
     double normalizedAmplitude() const;
+    qint64 visualTimestampMs() const;
+    double visualAmplitude() const;
     QString errorString() const;
 
 signals:
@@ -46,9 +53,11 @@ signals:
     void sourceNodeNameChanged();
     void captureSinkChanged();
     void valuesChanged();
+    void visualSampleChanged();
 
 private slots:
     void poll();
+    void commitVisualSample();
 
 private:
     bool m_active = false;
@@ -56,7 +65,11 @@ private:
     bool m_captureSink = false;
     AudioLevelSnapshot m_snapshot;
     AudioLevelCollector m_collector;
+    AudioVisualAnalyzer m_visualAnalyzer;
     QTimer m_timer;
+    QTimer m_visualTimer;
+    qint64 m_visualTimestampMs = 0;
+    double m_visualAmplitude = 0.0;
 
     void restart();
 };

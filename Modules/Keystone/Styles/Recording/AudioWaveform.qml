@@ -14,7 +14,7 @@ Item {
     property real barWidth: 3
     property real barGap: 3
     property real minimumHeight: 2
-    property real maximumHeight: 28
+    property real maximumHeight: 36
     property color activeColor: Appearance.colors.colError
     property color waitingColor: Appearance.applyAlpha(
         Appearance.colors.colOnSurfaceVariant, 0.32)
@@ -23,10 +23,7 @@ Item {
     property var _bornAt: []
     property int _head: 0
     property double _lastSourceTimestamp: 0
-    property double _lastSourceAt: 0
     property double _lastPushAt: 0
-    property real _pendingAverage: 0
-    property real _pendingPeak: 0
     readonly property int _sampleInterval: 160
 
     function clamp01(value) {
@@ -50,50 +47,21 @@ Item {
         _bornAt = born;
         _head = 0;
         _lastSourceTimestamp = 0;
-        _lastSourceAt = 0;
         _lastPushAt = Date.now();
-        _pendingAverage = 0;
-        _pendingPeak = 0;
         waveformCanvas.requestPaint();
     }
 
-    function collectSample(value, timestamp) {
-        if (timestamp <= _lastSourceTimestamp)
-            return;
-
-        const raw = sourceAvailable ? clamp01(value) : 0;
-        _pendingAverage += (raw - _pendingAverage) * 0.34;
-        _pendingPeak = Math.max(raw, _pendingPeak * 0.94);
-        _lastSourceTimestamp = timestamp;
-        _lastSourceAt = Date.now();
-    }
-
-    function commitSample() {
+    function pushSample(value, timestamp) {
         if (_levels.length !== activeBars)
             initialize();
 
         const now = Date.now();
-        const sourceIsFresh = sourceAvailable
-            && _lastSourceAt > 0
-            && now - _lastSourceAt < 320;
-        const previous = logicalLevel(activeBars - 1);
-        const previous2 = logicalLevel(activeBars - 2);
-        const current = sourceIsFresh
-            ? Math.max(_pendingAverage, _pendingPeak * 0.88)
-            : 0;
-        const envelope = 0.76 * current
-            + 0.17 * previous
-            + 0.07 * previous2;
-        const target = Math.max(envelope, current * 0.9);
-
         const replacement = _head;
-        _levels[replacement] = target;
+        _levels[replacement] = sourceAvailable ? clamp01(value) : 0;
         _bornAt[replacement] = now + Math.max(0, _sampleInterval - 90);
         _head = (_head + 1) % activeBars;
-
+        _lastSourceTimestamp = timestamp;
         _lastPushAt = now;
-        _pendingAverage *= 0.78;
-        _pendingPeak = _pendingAverage;
         waveformCanvas.requestPaint();
     }
 
@@ -120,8 +88,10 @@ Item {
     }
 
     onSampleTimestampMsChanged: {
-        if (active && acceptSamples)
-            collectSample(amplitude, sampleTimestampMs);
+        if (active && acceptSamples
+                && sampleTimestampMs > _lastSourceTimestamp) {
+            pushSample(amplitude, sampleTimestampMs);
+        }
     }
     onAcceptSamplesChanged: {
         if (acceptSamples)
@@ -129,13 +99,6 @@ Item {
     }
     onActiveBarsChanged: initialize()
     Component.onCompleted: initialize()
-
-    Timer {
-        interval: root._sampleInterval
-        repeat: true
-        running: root.active && root.acceptSamples
-        onTriggered: root.commitSample()
-    }
 
     Timer {
         interval: 16

@@ -13,6 +13,18 @@ target_link_libraries(clavis_core_tests PRIVATE
 
 add_test(NAME clavis_core_tests COMMAND clavis_core_tests)
 
+qt_add_executable(audio_visual_analyzer_tests
+    audio_visual_analyzer_test.cpp
+)
+
+target_link_libraries(audio_visual_analyzer_tests PRIVATE
+    ClavisAudioCore
+    Qt6::Core
+    Qt6::Test
+)
+
+add_test(NAME audio_visual_analyzer_tests COMMAND audio_visual_analyzer_tests)
+
 foreach(tool_target IN ITEMS fake_slurp fake_gsr fake_ffmpeg fake_ffprobe fake_pactl)
     qt_add_executable(${tool_target}
         fake_recording_tool.cpp

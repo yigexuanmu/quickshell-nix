@@ -21,7 +21,7 @@ Singleton {
     readonly property int hoverRadiusDelta: 3
 
     readonly property int audioRecordingWidth: 320
-    readonly property int audioRecordingHeight: 48
+    readonly property int audioRecordingHeight: 56
     readonly property int audioExpandDuration: 300
     readonly property int audioContentEnterDuration: 180
     readonly property int audioContentExitDuration: 120

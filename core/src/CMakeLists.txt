@@ -138,6 +138,8 @@ target_sources(ClavisAudioCore PRIVATE
     audio_collector.cpp
     audio_level_collector.h
     audio_level_collector.cpp
+    audio_visual_analyzer.h
+    audio_visual_analyzer.cpp
 )
 
 set_target_properties(ClavisAudioCore PROPERTIES POSITION_INDEPENDENT_CODE ON)
