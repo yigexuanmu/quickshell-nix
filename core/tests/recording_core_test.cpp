@@ -3,7 +3,6 @@
 #include "recording/audio/audio_source_resolver.h"
 #include "recording/gsr_backend.h"
 #include "recording/recording_types.h"
-#include "recording/slurp_selector.h"
 
 #include <QJsonArray>
 #include <QTest>
@@ -25,17 +24,17 @@ private slots:
 void RecordingCoreTest::normalizesRegionGeometry()
 {
     QString geometry;
-    QVERIFY(SlurpSelector::normalizeGeometry(QStringLiteral("1920x1080+0+0"), &geometry));
+    QVERIFY(normalizeRegionGeometry(QStringLiteral("1920x1080+0+0"), &geometry));
     QCOMPARE(geometry, QStringLiteral("1920x1080+0+0"));
-    QVERIFY(SlurpSelector::normalizeGeometry(QStringLiteral(" 640x480+-20+32\n"), &geometry));
+    QVERIFY(normalizeRegionGeometry(QStringLiteral(" 640x480+-20+32\n"), &geometry));
     QCOMPARE(geometry, QStringLiteral("640x480+-20+32"));
 }
 
 void RecordingCoreTest::rejectsInvalidRegionGeometry()
 {
-    QVERIFY(!SlurpSelector::normalizeGeometry(QStringLiteral("0x1080+0+0")));
-    QVERIFY(!SlurpSelector::normalizeGeometry(QStringLiteral("1920,1080 0x0")));
-    QVERIFY(!SlurpSelector::normalizeGeometry(QStringLiteral("anything")));
+    QVERIFY(!normalizeRegionGeometry(QStringLiteral("0x1080+0+0")));
+    QVERIFY(!normalizeRegionGeometry(QStringLiteral("1920,1080 0x0")));
+    QVERIFY(!normalizeRegionGeometry(QStringLiteral("anything")));
 }
 
 void RecordingCoreTest::roundTripsRecordingState()

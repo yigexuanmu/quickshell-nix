@@ -10,7 +10,11 @@ Singleton {
     readonly property int schemaVersion: 1
     property string commandName: "key"
 
-    property string state: "idle"
+    property string backendState: "idle"
+    property string transientState: ""
+    readonly property string state: transientState !== ""
+        ? transientState
+        : backendState
     property string sessionId: ""
     property int pid: 0
     property string recordingType: "video"
@@ -53,7 +57,7 @@ Singleton {
                 return false;
             }
 
-            root.state = response.state || "idle";
+            root.backendState = response.state || "idle";
             root.sessionId = response.sessionId || "";
             root.pid = response.pid || 0;
             root.recordingType = response.type || "video";
@@ -64,6 +68,8 @@ Singleton {
             root.error = response.error || null;
 
             const command = response.command || fallbackCommand;
+            if (command === "record.start")
+                root.transientState = "";
             if (response.cancelled === true)
                 root.selectionCancelled();
             if (root.error)
@@ -86,14 +92,35 @@ Singleton {
             return false;
 
         const settings = options || {};
+        root.error = null;
+        root.transientState = "selecting";
+        if (!RegionSelectionService.begin("record", {
+                type: type === "gif" ? "gif" : "video",
+                audio: settings.audio || "none",
+                fps: settings.fps || 60,
+                output: settings.output || ""
+            })) {
+            root.transientState = "";
+            return false;
+        }
+        return true;
+    }
+
+    function startSelected(geometry, options) {
+        if (!geometry || startProcess.running)
+            return false;
+
+        const settings = options || {};
         const command = [
             root.commandName,
             "record",
             "start",
             "--type",
-            type === "gif" ? "gif" : "video",
+            settings.type === "gif" ? "gif" : "video",
             "--target",
             "region",
+            "--geometry",
+            geometry,
             "--audio",
             settings.audio || "none",
             "--fps",
@@ -104,6 +131,8 @@ Singleton {
             command.splice(command.length - 1, 0, "--output", settings.output);
 
         root.error = null;
+        root.transientState = "starting";
+        root.target = { type: "region", geometry: geometry };
         startProcess.command = command;
         startProcess.running = true;
         return true;
@@ -124,6 +153,31 @@ Singleton {
         statusProcess.running = true;
     }
 
+    Connections {
+        target: RegionSelectionService
+
+        function onSelectionAccepted(action, geometry, options) {
+            if (action !== "record" || root.transientState !== "selecting")
+                return;
+            if (!root.startSelected(geometry, options)) {
+                root.transientState = "";
+                root.error = {
+                    code: "record_start_unavailable",
+                    message: "无法启动录制命令"
+                };
+                root.commandError(root.error.code, root.error.message);
+            }
+        }
+
+        function onSelectionCancelled(action) {
+            if (action !== "record" || root.transientState !== "selecting")
+                return;
+            root.transientState = "";
+            root.selectionCancelled();
+            root.commandFinished("record.start", false);
+        }
+    }
+
     Process {
         id: startProcess
 
@@ -133,6 +187,7 @@ Singleton {
 
         onExited: exitCode => {
             root.lastExitCode = exitCode;
+            root.transientState = "";
             root.refresh();
         }
     }

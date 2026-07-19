@@ -5,7 +5,6 @@
 #include "ffmpeg_postprocessor.h"
 #include "gsr_backend.h"
 #include "recording_state_store.h"
-#include "slurp_selector.h"
 
 namespace Clavis::Recording {
 
@@ -18,7 +17,6 @@ public:
 private:
     RecordingStateStore m_store;
     CaptureSessionGuard m_captureGuard;
-    SlurpSelector m_selector;
     GsrBackend m_backend;
     FfmpegPostprocessor m_postprocessor;
     DependencyProbe m_dependencies;

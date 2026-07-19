@@ -17,8 +17,6 @@ enum ExitCode {
     RecorderStartFailure = 6,
     RecorderStopFailure = 7,
     PostprocessFailure = 8,
-    SelectionFailure = 9,
-    SelectionCancelled = 10,
     NiriUnavailable = 11,
 };
 
@@ -75,6 +73,7 @@ struct RecordingSession {
 struct StartOptions {
     RecordingType type = RecordingType::Video;
     QString target = QStringLiteral("region");
+    QString geometry;
     QString audio = QStringLiteral("none");
     int fps = 60;
     QString outputDirectory;
@@ -94,6 +93,7 @@ QString recordingStateName(RecordingState state);
 bool parseRecordingState(const QString &name, RecordingState *state);
 QString recordingTypeName(RecordingType type);
 bool parseRecordingType(const QString &name, RecordingType *type);
+bool normalizeRegionGeometry(const QString &value, QString *normalized = nullptr);
 RecordingSession idleSession();
 RecordingError makeError(const QString &code, const QString &message,
                          const QJsonObject &details = {});

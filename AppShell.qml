@@ -6,6 +6,7 @@ import qs.Modules.Bar
 import qs.Modules.Keystone
 import qs.Modules.Launcher
 import qs.Modules.Lock
+import qs.Modules.RegionSelector
 import qs.Modules.Sidebars.Left
 import qs.Modules.Sidebars.Right
 import qs.Modules.Wallpaper
@@ -21,6 +22,8 @@ Item {
     Bar {}
 
     Keystone {}
+
+    RegionSelector {}
 
     LeftSidebarWindow {}
 

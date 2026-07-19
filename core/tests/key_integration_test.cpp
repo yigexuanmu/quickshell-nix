@@ -15,7 +15,7 @@ class KeyIntegrationTest : public QObject {
 private slots:
     void init();
     void cleanup();
-    void cancelsRegionSelection();
+    void rejectsMissingRegionGeometry();
     void reportsMissingDependencies();
     void reportsRecorderStartFailure();
     void recordsAndFinalizesVideo();
@@ -58,7 +58,6 @@ void KeyIntegrationTest::init()
     m_environment.insert(QStringLiteral("XDG_RUNTIME_DIR"),
                          m_temporary->filePath(QStringLiteral("runtime")));
     m_environment.insert(QStringLiteral("HOME"), m_temporary->path());
-    m_environment.remove(QStringLiteral("CLAVIS_TEST_SLURP_CANCEL"));
 }
 
 void KeyIntegrationTest::cleanup()
@@ -69,9 +68,8 @@ void KeyIntegrationTest::cleanup()
     m_temporary.reset();
 }
 
-void KeyIntegrationTest::cancelsRegionSelection()
+void KeyIntegrationTest::rejectsMissingRegionGeometry()
 {
-    m_environment.insert(QStringLiteral("CLAVIS_TEST_SLURP_CANCEL"), QStringLiteral("1"));
     const KeyResult start = runKey({
         QStringLiteral("record"),
         QStringLiteral("start"),
@@ -83,21 +81,12 @@ void KeyIntegrationTest::cancelsRegionSelection()
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
     });
-    QCOMPARE(start.exitCode, 10);
-    QCOMPARE(start.json.value(QStringLiteral("cancelled")).toBool(), true);
+    QCOMPARE(start.exitCode, 2);
+    QCOMPARE(start.json.value(QStringLiteral("cancelled")).toBool(), false);
     QCOMPARE(start.json.value(QStringLiteral("state")).toString(), QStringLiteral("idle"));
-
-    const KeyResult status =
-        runKey({QStringLiteral("record"), QStringLiteral("status"), QStringLiteral("--json")});
-    QCOMPARE(status.exitCode, 0);
-    QCOMPARE(status.json.value(QStringLiteral("state")).toString(), QStringLiteral("idle"));
-
-    const KeyResult stop =
-        runKey({QStringLiteral("record"), QStringLiteral("stop"), QStringLiteral("--json")});
-    QCOMPARE(stop.exitCode, 5);
-    QCOMPARE(stop.json.value(QStringLiteral("error")).toObject()
+    QCOMPARE(start.json.value(QStringLiteral("error")).toObject()
                  .value(QStringLiteral("code")).toString(),
-             QStringLiteral("no_active_recording"));
+             QStringLiteral("missing_geometry"));
 }
 
 void KeyIntegrationTest::recordsAndFinalizesVideo()
@@ -167,6 +156,8 @@ void KeyIntegrationTest::rejectsCrossCaptureConflicts()
         QStringLiteral("start"),
         QStringLiteral("--type"),
         QStringLiteral("video"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -184,6 +175,8 @@ void KeyIntegrationTest::rejectsCrossCaptureConflicts()
         QStringLiteral("start"),
         QStringLiteral("--type"),
         QStringLiteral("video"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -218,6 +211,8 @@ void KeyIntegrationTest::reportsMissingDependencies()
     const KeyResult start = runKey({
         QStringLiteral("record"),
         QStringLiteral("start"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -236,6 +231,8 @@ void KeyIntegrationTest::reportsRecorderStartFailure()
     const KeyResult start = runKey({
         QStringLiteral("record"),
         QStringLiteral("start"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -254,6 +251,8 @@ void KeyIntegrationTest::retriesFailedFinalization()
         QStringLiteral("start"),
         QStringLiteral("--type"),
         QStringLiteral("video"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -313,6 +312,8 @@ void KeyIntegrationTest::exerciseLifecycle(const QString &type, const QString &e
         type,
         QStringLiteral("--target"),
         QStringLiteral("region"),
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),
@@ -338,6 +339,8 @@ void KeyIntegrationTest::exerciseLifecycle(const QString &type, const QString &e
         QStringLiteral("start"),
         QStringLiteral("--type"),
         type,
+        QStringLiteral("--geometry"),
+        QStringLiteral("640x480+12+34"),
         QStringLiteral("--output"),
         m_temporary->filePath(QStringLiteral("output")),
         QStringLiteral("--json"),

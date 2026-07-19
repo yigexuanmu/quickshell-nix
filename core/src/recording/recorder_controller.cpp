@@ -6,7 +6,6 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QJsonArray>
-#include <QStandardPaths>
 #include <QThread>
 #include <QUuid>
 
@@ -15,6 +14,38 @@ namespace Clavis::Recording {
 OperationResult RecorderController::start(const StartOptions &options)
 {
     RecordingError error;
+    if (options.target != QStringLiteral("region")) {
+        return failure(UsageError,
+                       makeError(QStringLiteral("unsupported_target"),
+                                 QStringLiteral("Only the region recording target is supported")));
+    }
+    QString geometry;
+    if (options.geometry.trimmed().isEmpty()) {
+        return failure(
+            UsageError,
+            makeError(QStringLiteral("missing_geometry"),
+                      QStringLiteral("Region geometry must be provided with --geometry"),
+                      {{QStringLiteral("expected"), QStringLiteral("WIDTHxHEIGHT+X+Y")}}));
+    }
+    if (!normalizeRegionGeometry(options.geometry, &geometry)) {
+        return failure(
+            UsageError,
+            makeError(QStringLiteral("invalid_geometry"),
+                      QStringLiteral("A valid region geometry must be provided with --geometry"),
+                      {{QStringLiteral("expected"), QStringLiteral("WIDTHxHEIGHT+X+Y")}}));
+    }
+    if (options.fps < 1 || options.fps > 240) {
+        return failure(UsageError,
+                       makeError(QStringLiteral("invalid_fps"),
+                                 QStringLiteral("FPS must be between 1 and 240")));
+    }
+    if (options.audio != QStringLiteral("none")
+        && options.audio != QStringLiteral("system")) {
+        return failure(UsageError,
+                       makeError(QStringLiteral("unsupported_audio"),
+                                 QStringLiteral("Audio must be 'none' or 'system'")));
+    }
+
     std::unique_ptr<QLockFile> captureLock = m_captureGuard.acquire(&error);
     if (!captureLock)
         return failure(error.code == QStringLiteral("capture_busy")
@@ -75,27 +106,11 @@ OperationResult RecorderController::start(const StartOptions &options)
             current);
     }
 
-    if (options.target != QStringLiteral("region")) {
-        return failure(UsageError,
-                       makeError(QStringLiteral("unsupported_target"),
-                                 QStringLiteral("Only the region recording target is supported")));
-    }
-    if (options.fps < 1 || options.fps > 240) {
-        return failure(UsageError,
-                       makeError(QStringLiteral("invalid_fps"),
-                                 QStringLiteral("FPS must be between 1 and 240")));
-    }
-    if (options.audio != QStringLiteral("none")
-        && options.audio != QStringLiteral("system")) {
-        return failure(UsageError,
-                       makeError(QStringLiteral("unsupported_audio"),
-                                 QStringLiteral("Audio must be 'none' or 'system'")));
-    }
-
     RecordingSession session;
     session.sessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     session.type = options.type;
     session.targetType = options.target;
+    session.geometry = geometry;
     session.fps = options.fps;
     session.audio = options.audio;
     const ProcessIdentity coordinator =
@@ -107,32 +122,6 @@ OperationResult RecorderController::start(const StartOptions &options)
         return failure(DependencyFailure, error, session);
     if (!recordingDependenciesAvailable(QFileInfo(session.outputPath).absolutePath(), &error))
         return failure(DependencyFailure, error, session);
-    session.state = RecordingState::Selecting;
-    if (!persist(&session, &error))
-        return failure(StateFailure, error, session);
-
-    const SelectionResult selection = m_selector.selectRegion();
-    if (selection.cancelled) {
-        session = idleSession();
-        if (!persist(&session, &error))
-            return failure(StateFailure, error, session);
-        OperationResult result;
-        result.cancelled = true;
-        result.exitCode = SelectionCancelled;
-        result.session = session;
-        return result;
-    }
-    if (!selection.ok) {
-        session = idleSession();
-        session.error = selection.error;
-        persist(&session, nullptr);
-        const int exitCode = selection.error.code == QStringLiteral("dependency_missing")
-            ? DependencyFailure
-            : SelectionFailure;
-        return failure(exitCode, selection.error, session);
-    }
-
-    session.geometry = selection.geometry;
     session.state = RecordingState::Starting;
     session.error = {};
     if (!persist(&session, &error))

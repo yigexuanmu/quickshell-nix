@@ -52,7 +52,7 @@ QString CommandRouter::helpText()
         "  key audio start --source mic|system [--output DIRECTORY] [--json]\n"
         "  key audio status [--json]\n"
         "  key audio stop [--json]\n"
-        "  key record start --type video|gif --target region [options]\n"
+        "  key record start --type video|gif --geometry WIDTHxHEIGHT+X+Y [options]\n"
         "  key record status [--json]\n"
         "  key record stop [--json]\n"
         "  key cast list [--json]\n"
@@ -61,6 +61,7 @@ QString CommandRouter::helpText()
         "Recording options:\n"
         "  --type TYPE         video or gif (default: video)\n"
         "  --target TARGET     region (default: region)\n"
+        "  --geometry REGION   required compositor-logical WIDTHxHEIGHT+X+Y\n"
         "  --audio SOURCE      none or system (default: none)\n"
         "  --fps NUMBER        capture rate from 1 to 240 (default: 60)\n"
         "  --output DIRECTORY  output directory\n"
@@ -69,7 +70,7 @@ QString CommandRouter::helpText()
         "Exit codes:\n"
         "  0 success, 2 usage, 3 dependency/output, 4 session conflict\n"
         "  5 state, 6 recorder start, 7 recorder stop, 8 post-process\n"
-        "  9 selection, 10 selection cancelled, 11 niri unavailable\n");
+        "  11 niri unavailable\n");
 }
 
 CommandResult CommandRouter::usageError(const QString &message, bool jsonRequested)

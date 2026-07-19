@@ -29,7 +29,6 @@ QList<DependencyCheck> DependencyProbe::run(const QString &outputDirectory,
     RecordingStateStore store;
     QList<DependencyCheck> checks{
         executable(QStringLiteral("gpu-screen-recorder")),
-        executable(QStringLiteral("slurp")),
         executable(QStringLiteral("ffmpeg")),
         executable(QStringLiteral("ffprobe")),
         niriSocket(),

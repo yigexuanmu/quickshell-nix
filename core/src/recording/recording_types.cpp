@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QJsonValue>
+#include <QRegularExpression>
 
 namespace Clavis::Recording {
 
@@ -215,6 +216,31 @@ bool parseRecordingType(const QString &name, RecordingType *type)
         *type = RecordingType::Gif;
     else
         return false;
+    return true;
+}
+
+bool normalizeRegionGeometry(const QString &value, QString *normalized)
+{
+    static const QRegularExpression expression(
+        QStringLiteral(R"(^\s*(\d+)x(\d+)\+(-?\d+)\+(-?\d+)\s*$)"));
+    const QRegularExpressionMatch match = expression.match(value);
+    if (!match.hasMatch())
+        return false;
+
+    bool widthOk = false;
+    bool heightOk = false;
+    const int width = match.captured(1).toInt(&widthOk);
+    const int height = match.captured(2).toInt(&heightOk);
+    if (!widthOk || !heightOk || width <= 0 || height <= 0)
+        return false;
+
+    if (normalized) {
+        *normalized = QStringLiteral("%1x%2+%3+%4")
+                          .arg(width)
+                          .arg(height)
+                          .arg(match.captured(3).toInt())
+                          .arg(match.captured(4).toInt());
+    }
     return true;
 }
 

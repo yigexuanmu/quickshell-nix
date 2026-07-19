@@ -54,6 +54,10 @@ CommandResult RecordCommand::run(const QStringList &arguments) const
             options.target = arguments.at(++index);
             continue;
         }
+        if (argument == QStringLiteral("--geometry") && index + 1 < arguments.size()) {
+            options.geometry = arguments.at(++index);
+            continue;
+        }
         if (argument == QStringLiteral("--audio") && index + 1 < arguments.size()) {
             options.audio = arguments.at(++index);
             continue;

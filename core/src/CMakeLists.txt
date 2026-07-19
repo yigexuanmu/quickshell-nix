@@ -103,8 +103,6 @@ target_sources(ClavisRecordingCore PRIVATE
     recording/capture_session_guard.cpp
     recording/recording_state_store.h
     recording/recording_state_store.cpp
-    recording/slurp_selector.h
-    recording/slurp_selector.cpp
     recording/gsr_backend.h
     recording/gsr_backend.cpp
     recording/ffmpeg_postprocessor.h

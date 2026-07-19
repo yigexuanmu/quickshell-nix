@@ -19,23 +19,6 @@ void handleSignal(int)
     stopRequested.store(true);
 }
 
-int fakeSlurp()
-{
-    if (qEnvironmentVariableIsSet("CLAVIS_TEST_SLURP_CANCEL"))
-        return 1;
-
-    // Real slurp consumes redirected stdin before connecting to Wayland. Keep
-    // this behavior in the fake so an unclosed QProcess input pipe regresses
-    // into a deterministic integration-test timeout.
-    QFile input;
-    if (!input.open(stdin, QIODevice::ReadOnly))
-        return 2;
-    input.readAll();
-
-    QTextStream(stdout) << "640x480+12+34" << Qt::endl;
-    return 0;
-}
-
 int fakeRecorder(const QStringList &arguments)
 {
     if (qEnvironmentVariableIsSet("CLAVIS_TEST_GSR_FAIL"))
@@ -173,8 +156,6 @@ int main(int argc, char *argv[])
     QCoreApplication application(argc, argv);
     const QString tool = QFileInfo(QString::fromLocal8Bit(argv[0])).fileName();
     const QStringList arguments = QCoreApplication::arguments().mid(1);
-    if (tool == QStringLiteral("slurp"))
-        return fakeSlurp();
     if (tool == QStringLiteral("gpu-screen-recorder"))
         return fakeRecorder(arguments);
     if (tool == QStringLiteral("ffprobe"))
