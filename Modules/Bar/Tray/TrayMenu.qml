@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
@@ -19,6 +18,14 @@ PanelWindow {
     property real anchorGap: 4
     property real menuX: edgeMargin
     property real menuY: edgeMargin
+    property var submenuStack: []
+    property bool submenuLoading: false
+    property int submenuRefreshAttempt: 0
+    readonly property int menuDepth: submenuStack.length
+    readonly property var currentSubmenuEntry: menuDepth > 0 ? submenuStack[menuDepth - 1] : null
+    readonly property var currentSubmenuHandle: currentSubmenuEntry
+                                                 ? (currentSubmenuEntry.menu || currentSubmenuEntry)
+                                                 : null
 
     signal menuClosed()
     signal menuOpened(var qsWindow)
@@ -43,6 +50,53 @@ PanelWindow {
 
     function clamp(value, minimum, maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    function refreshMenuHandle(handle) {
+        if (handle && typeof handle.updateLayout === "function")
+            handle.updateLayout();
+    }
+
+    function beginSubmenuRefresh() {
+        if (root.menuDepth === 0)
+            return;
+
+        root.submenuRefreshAttempt = 0;
+        root.submenuLoading = true;
+        root.refreshMenuHandle(root.currentSubmenuHandle);
+        submenuRefreshTimer.restart();
+    }
+
+    function pushSubmenu(entry) {
+        if (!entry || entry.hasChildren !== true)
+            return;
+
+        const nextStack = root.submenuStack.slice();
+        nextStack.push(entry);
+        root.submenuStack = nextStack;
+        root.beginSubmenuRefresh();
+        Qt.callLater(root.updatePosition);
+    }
+
+    function popSubmenu() {
+        if (root.menuDepth === 0)
+            return;
+
+        submenuRefreshTimer.stop();
+        root.submenuLoading = false;
+
+        const nextStack = root.submenuStack.slice(0, -1);
+        root.submenuStack = nextStack;
+        if (root.menuDepth > 0)
+            root.beginSubmenuRefresh();
+        Qt.callLater(root.updatePosition);
+    }
+
+    function resetSubmenus() {
+        submenuRefreshTimer.stop();
+        root.submenuLoading = false;
+        root.submenuRefreshAttempt = 0;
+        root.submenuStack = [];
     }
 
     function updatePosition() {
@@ -80,6 +134,7 @@ PanelWindow {
     }
 
     function open() {
+        root.resetSubmenus();
         root.visible = true;
         root.menuOpened(root);
         Qt.callLater(() => {
@@ -89,12 +144,11 @@ PanelWindow {
     }
 
     function close() {
-        if (!root.visible && stackView.depth <= 1)
+        if (!root.visible && root.menuDepth === 0)
             return;
 
         root.visible = false;
-        while (stackView.depth > 1)
-            stackView.pop();
+        root.resetSubmenus();
         root.menuClosed();
     }
 
@@ -109,6 +163,34 @@ PanelWindow {
     Item {
         id: inputRegion
         anchors.fill: parent
+    }
+
+    Timer {
+        id: submenuRefreshTimer
+
+        interval: 150
+        repeat: true
+
+        onTriggered: {
+            if (root.menuDepth === 0) {
+                stop();
+                root.submenuLoading = false;
+                return;
+            }
+
+            if (menuContent.menuEntries.length > 0) {
+                stop();
+                root.submenuLoading = false;
+                return;
+            }
+
+            root.submenuRefreshAttempt += 1;
+            root.refreshMenuHandle(root.currentSubmenuHandle);
+            if (root.submenuRefreshAttempt >= 5) {
+                stop();
+                root.submenuLoading = false;
+            }
+        }
     }
 
     MouseArea {
@@ -134,11 +216,21 @@ PanelWindow {
         focus: root.visible
 
         Keys.onEscapePressed: event => {
-            if (stackView.depth > 1)
-                stackView.pop();
+            if (root.menuDepth > 0)
+                root.popSubmenu();
             else
                 root.close();
             event.accepted = true;
+        }
+
+        QsMenuOpener {
+            id: rootMenuOpener
+            menu: root.trayItemMenuHandle
+        }
+
+        QsMenuOpener {
+            id: submenuOpener
+            menu: root.currentSubmenuHandle
         }
 
         Item {
@@ -166,8 +258,8 @@ PanelWindow {
 
                 x: root.padding
                 y: root.padding
-                implicitWidth: stackView.implicitWidth + popupPadding * 2
-                implicitHeight: stackView.implicitHeight + popupPadding * 2
+                implicitWidth: menuContent.implicitWidth + popupPadding * 2
+                implicitHeight: menuContent.implicitHeight + popupPadding * 2
                 color: Appearance.colors.colLayer0
                 radius: 18
                 border.width: 1
@@ -202,70 +294,42 @@ PanelWindow {
                     }
                 }
 
-                StackView {
-                    id: stackView
+                MenuContent {
+                    id: menuContent
 
                     anchors {
                         fill: parent
                         margins: popupBackground.popupPadding
                     }
 
-                    implicitWidth: currentItem ? currentItem.implicitWidth : 0
-                    implicitHeight: currentItem ? currentItem.implicitHeight : 0
-
                     onImplicitWidthChanged: Qt.callLater(root.updatePosition)
                     onImplicitHeightChanged: Qt.callLater(root.updatePosition)
-
-                    pushEnter: NoAnim {}
-                    pushExit: NoAnim {}
-                    popEnter: NoAnim {}
-                    popExit: NoAnim {}
-
-                    initialItem: SubMenu {
-                        handle: root.trayItemMenuHandle
-                    }
                 }
             }
         }
     }
 
-    component NoAnim: Transition {
-        NumberAnimation { duration: 0 }
-    }
-
-    component SubMenu: ColumnLayout {
+    component MenuContent: ColumnLayout {
         id: submenu
 
-        required property var handle
-        property bool isSubMenu: false
-        property bool shown: false
-        readonly property var menuEntries: menuOpener.children ? menuOpener.children.values : []
-
-        opacity: shown ? 1 : 0
+        readonly property var menuModel: root.menuDepth > 0 ? submenuOpener.children : rootMenuOpener.children
+        readonly property var menuEntries: menuModel ? menuModel.values : []
         spacing: 0
 
-        Behavior on opacity {
-            NumberAnimation {
-                alwaysRunToEnd: true
-                duration: Appearance.animation.expressiveEffects.duration
-                easing.type: Appearance.animation.expressiveEffects.type
-                easing.bezierCurve: Appearance.animation.expressiveEffects.bezierCurve
+        onMenuEntriesChanged: {
+            if (root.menuDepth > 0 && menuEntries.length > 0) {
+                submenuRefreshTimer.stop();
+                root.submenuLoading = false;
+                root.submenuRefreshAttempt = 0;
+            } else if (root.menuDepth > 0 && root.visible && !root.submenuLoading) {
+                root.beginSubmenuRefresh();
             }
-        }
-
-        Component.onCompleted: shown = true
-        StackView.onActivating: shown = true
-        StackView.onDeactivating: shown = false
-        StackView.onRemoved: destroy()
-
-        QsMenuOpener {
-            id: menuOpener
-            menu: submenu.handle ? (submenu.handle.menu || submenu.handle) : null
+            Qt.callLater(root.updatePosition);
         }
 
         Loader {
             Layout.fillWidth: true
-            visible: submenu.isSubMenu
+            visible: root.menuDepth > 0
             active: visible
 
             sourceComponent: MaterialRippleButton {
@@ -279,7 +343,7 @@ PanelWindow {
                 implicitWidth: backContent.implicitWidth + 24
                 implicitHeight: 36
                 Layout.fillWidth: true
-                releaseAction: () => stackView.pop()
+                releaseAction: () => root.popSubmenu()
 
                 contentItem: RowLayout {
                     id: backContent
@@ -313,7 +377,7 @@ PanelWindow {
         MaterialRippleButton {
             id: pinEntry
 
-            visible: root.trayItemId.length > 0 && stackView.depth === 1
+            visible: root.trayItemId.length > 0 && root.menuDepth === 0
             buttonRadius: popupBackground.radius - popupBackground.popupPadding
             colBackground: Appearance.transparentize(Appearance.colors.colLayer0, 1)
             colBackgroundHover: Appearance.colors.colSecondaryContainer
@@ -360,6 +424,38 @@ PanelWindow {
             Layout.bottomMargin: 4
         }
 
+        RowLayout {
+            visible: root.menuDepth > 0 && submenu.menuEntries.length === 0
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.topMargin: 8
+            Layout.bottomMargin: 8
+            spacing: 8
+
+            MaterialSymbol {
+                text: root.submenuLoading ? "progress_activity" : "inbox"
+                iconSize: 18
+                color: Appearance.colors.colOnSurfaceVariant
+
+                RotationAnimator on rotation {
+                    from: 0
+                    to: 360
+                    duration: 900
+                    loops: Animation.Infinite
+                    running: root.submenuLoading
+                }
+            }
+
+            Text {
+                text: root.submenuLoading ? "正在加载…" : "暂无可用项目"
+                color: Appearance.colors.colOnSurfaceVariant
+                font.family: Sizes.fontFamily
+                font.pixelSize: 13
+                Layout.fillWidth: true
+            }
+        }
+
         Repeater {
             id: menuEntriesRepeater
 
@@ -378,7 +474,7 @@ PanelWindow {
                 return false;
             }
 
-            model: menuOpener.children
+            model: submenu.menuModel
 
             delegate: TrayMenuEntry {
                 required property var modelData
@@ -389,24 +485,8 @@ PanelWindow {
                 buttonRadius: popupBackground.radius - popupBackground.popupPadding
 
                 onDismiss: root.close()
-                onOpenSubmenu: handle => {
-                    const menuHandle = handle ? (handle.menu || handle) : null;
-                    stackView.push(subMenuComponent.createObject(null, {
-                        "handle": handle,
-                        "isSubMenu": true
-                    }));
-                    Qt.callLater(() => {
-                        if (menuHandle && typeof menuHandle.updateLayout === "function")
-                            menuHandle.updateLayout();
-                        root.updatePosition();
-                    });
-                }
+                onOpenSubmenu: handle => root.pushSubmenu(handle)
             }
         }
-    }
-
-    Component {
-        id: subMenuComponent
-        SubMenu {}
     }
 }
