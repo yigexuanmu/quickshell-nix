@@ -85,7 +85,11 @@ WidgetPanel {
     function subtitleForType(type) {
         switch (type) {
         case "network":
-            return Network.wifiEnabled ? Network.activeConnection : "已关闭";
+            if (!NetworkService.available)
+                return "不可用";
+            if (!NetworkService.wifiAvailable)
+                return "无 Wi-Fi 设备";
+            return NetworkService.wifiEnabled ? NetworkService.activeConnection : "已关闭";
         case "bluetooth":
             if (!BluetoothService.available)
                 return "不可用";
@@ -93,7 +97,7 @@ WidgetPanel {
                 return "已关闭";
             return BluetoothService.connected ? (BluetoothService.connectedName || "已连接") : "已开启";
         case "caffeine":
-            return Idle.inhibited ? "保持唤醒" : "正常休眠";
+            return IdleService.inhibited ? "保持唤醒" : "正常休眠";
         case "mic":
             return Volume.sourceMuted ? "已静音" : "已开启";
         case "audio":
@@ -110,7 +114,7 @@ WidgetPanel {
     function iconForType(type) {
         switch (type) {
         case "network":
-            return Network.wifiEnabled ? "wifi" : "wifi_off";
+            return NetworkService.wifiEnabled ? "wifi" : "wifi_off";
         case "bluetooth":
             return BluetoothService.connected ? "bluetooth_connected" : BluetoothService.enabled ? "bluetooth" : "bluetooth_disabled";
         case "caffeine":
@@ -130,9 +134,9 @@ WidgetPanel {
 
     function toggledForType(type) {
         switch (type) {
-        case "network": return Network.wifiEnabled;
+        case "network": return NetworkService.wifiEnabled;
         case "bluetooth": return BluetoothService.enabled;
-        case "caffeine": return Idle.inhibited;
+        case "caffeine": return IdleService.inhibited;
         case "mic": return !Volume.sourceMuted;
         case "audio": return !Volume.sinkMuted && Volume.sinkVolume > 0;
         case "theme": return PersonalizationConfig.themeMode === "dark";
@@ -143,6 +147,7 @@ WidgetPanel {
 
     function availableForType(type) {
         switch (type) {
+        case "network": return NetworkService.available && NetworkService.wifiAvailable;
         case "bluetooth": return BluetoothService.available;
         default: return true;
         }
@@ -151,13 +156,13 @@ WidgetPanel {
     function triggerType(type) {
         switch (type) {
         case "network":
-            Network.toggleWifi();
+            NetworkService.toggleWifi();
             break;
         case "bluetooth":
             BluetoothService.toggle();
             break;
         case "caffeine":
-            Idle.toggle();
+            IdleService.toggleInhibited();
             break;
         case "mic":
             Volume.toggleSourceMute();

@@ -35,6 +35,14 @@ Item {
         id: sessionLocker
     }
 
+    Connections {
+        target: IdleService
+
+        function onLockRequested() {
+            IdleService.reportLockResult(sessionLocker.open());
+        }
+    }
+
     IpcHandler {
         target: "lock"
 

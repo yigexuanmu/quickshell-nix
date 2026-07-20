@@ -31,9 +31,9 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             color: Appearance.colors.colOnPrimaryContainer 
             text: {
-                if (Network.activeConnectionType === "ETHERNET") return "󰈀";
-                if (!Network.connected) return "󰤭"; 
-                let strength = Network.signalStrength; 
+                if (NetworkService.activeConnectionType === "ETHERNET") return "󰈀";
+                if (!NetworkService.connected) return "󰤭";
+                let strength = NetworkService.signalStrength;
                 if (strength >= 80) return "󰤨";
                 if (strength >= 60) return "󰤥";
                 if (strength >= 40) return "󰤢";
@@ -44,7 +44,7 @@ Rectangle {
 
         Text {
             id: nameText
-            text: Network.activeConnection 
+            text: NetworkService.activeConnection
             font.bold: true 
             font.pixelSize: 12 
             color: Appearance.colors.colOnPrimaryContainer 
@@ -74,8 +74,8 @@ Rectangle {
 
     PopupToolTip {
         extraVisibleCondition: mouseArea.containsMouse
-        text: Network.connected
-              ? ((Network.activeConnection || "网络已连接") + "\n点击打开网络设置")
+        text: NetworkService.connected
+              ? ((NetworkService.activeConnection || "网络已连接") + "\n点击打开网络设置")
               : "网络未连接\n点击打开网络设置"
     }
 }

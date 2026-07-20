@@ -14,13 +14,24 @@ WidgetPanel {
     closeAction: () => WidgetState.qsOpen = false
 
     property bool isActive: WidgetState.qsOpen && WidgetState.qsView === "network"
+    property bool scanLeaseAcquired: false
     property string mdFont: "Material Symbols Outlined"
 
-    onIsActiveChanged: {
-        if (isActive) {
-            Network.enableWifi();
-            Network.rescanWifi();
+    function updateScanLease() {
+        if (isActive && !scanLeaseAcquired) {
+            NetworkService.acquireScan("right-sidebar-network");
+            scanLeaseAcquired = true;
+        } else if (!isActive && scanLeaseAcquired) {
+            NetworkService.releaseScan("right-sidebar-network");
+            scanLeaseAcquired = false;
         }
+    }
+
+    onIsActiveChanged: updateScanLease()
+    Component.onCompleted: updateScanLease()
+    Component.onDestruction: {
+        if (scanLeaseAcquired)
+            NetworkService.releaseScan("right-sidebar-network");
     }
 
     headerTools: RowLayout {
@@ -29,18 +40,20 @@ WidgetPanel {
         Rectangle {
             id: mainSwitch
             width: 44; height: 24; radius: 12 
-            color: Network.wifiEnabled ? Appearance.colors.colPrimary : "transparent"
-            border.width: Network.wifiEnabled ? 0 : 2
+            color: NetworkService.wifiEnabled ? Appearance.colors.colPrimary : "transparent"
+            border.width: NetworkService.wifiEnabled ? 0 : 2
             border.color: Appearance.colors.colOutline
+            enabled: NetworkService.available && NetworkService.wifiHardwareEnabled
+            opacity: enabled ? 1 : 0.5
             Behavior on color { ColorAnimation { duration: 250 } }
             
             Rectangle { 
-                width: Network.wifiEnabled ? 16 : 12
-                height: Network.wifiEnabled ? 16 : 12
+                width: NetworkService.wifiEnabled ? 16 : 12
+                height: NetworkService.wifiEnabled ? 16 : 12
                 radius: width / 2
-                x: Network.wifiEnabled ? parent.width - width - 4 : 6
+                x: NetworkService.wifiEnabled ? parent.width - width - 4 : 6
                 anchors.verticalCenter: parent.verticalCenter
-                color: Network.wifiEnabled ? Appearance.colors.colOnPrimary : Appearance.colors.colOutline
+                color: NetworkService.wifiEnabled ? Appearance.colors.colOnPrimary : Appearance.colors.colOutline
                 
                 Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } } 
                 Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
@@ -54,14 +67,14 @@ WidgetPanel {
                     font.pixelSize: 12 // 图标等比例缩小
                     font.bold: true
                     color: Appearance.colors.colPrimary
-                    opacity: Network.wifiEnabled ? 1 : 0
+                    opacity: NetworkService.wifiEnabled ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 200 } }
                 }
             }
             
             MouseArea { 
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: Network.toggleWifi()
+                onClicked: NetworkService.toggleWifi()
             }
         }
     }
@@ -73,8 +86,8 @@ WidgetPanel {
 
         ProgressBar {
             Layout.fillWidth: true
-            Layout.preferredHeight: Network.wifiScanning ? 4 : 0
-            opacity: Network.wifiScanning ? 1 : 0
+            Layout.preferredHeight: NetworkService.wifiScanning ? 4 : 0
+            opacity: NetworkService.wifiScanning ? 1 : 0
             indeterminate: true
             Material.accent: Appearance.colors.colPrimary
 
@@ -82,12 +95,35 @@ WidgetPanel {
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
+        Label {
+            Layout.fillWidth: true
+            visible: text.length > 0
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            color: NetworkService.lastError.length > 0
+                ? Appearance.colors.colError
+                : Appearance.colors.colOnLayer1
+            text: {
+                if (NetworkService.lastError.length > 0)
+                    return NetworkService.lastError;
+                if (!NetworkService.available)
+                    return "NetworkManager 不可用";
+                if (!NetworkService.wifiAvailable)
+                    return "未检测到 Wi-Fi 设备";
+                if (!NetworkService.wifiEnabled)
+                    return "Wi-Fi 已关闭";
+                if (NetworkService.friendlyWifiNetworks.length === 0)
+                    return NetworkService.wifiScanning ? "正在扫描网络…" : "没有可用网络";
+                return "";
+            }
+        }
+
         StyledListView {
             id: wifiList
 
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: Network.friendlyWifiNetworks
+            model: NetworkService.friendlyWifiNetworks
 
             delegate: WifiNetworkItem {
                 required property var modelData
@@ -106,7 +142,7 @@ WidgetPanel {
         readonly property bool networkAskingPassword: wifiNetwork && wifiNetwork.askingPassword
         readonly property int networkStrength: wifiNetwork ? wifiNetwork.strength : 0
         readonly property string networkSsid: wifiNetwork ? wifiNetwork.ssid : "未知网络"
-        readonly property bool publicPortalShown: itemRoot.networkActive && !itemRoot.networkSecure
+        readonly property bool publicPortalShown: itemRoot.networkActive && NetworkService.captivePortal
         readonly property real verticalPadding: 12
         readonly property real baseHeight: networkRow.implicitHeight + itemRoot.verticalPadding * 2
         readonly property real passwordPromptTargetHeight: itemRoot.networkAskingPassword ? passwordPromptContent.implicitHeight + 8 : 0
@@ -124,7 +160,9 @@ WidgetPanel {
                 return Appearance.colors.colLayer2Hover;
             return "transparent";
         }
-        enabled: !(Network.wifiConnectTarget === itemRoot.wifiNetwork && !itemRoot.networkActive)
+        enabled: !(NetworkService.wifiConnectTarget
+                   && NetworkService.wifiConnectTarget.ssid === itemRoot.networkSsid
+                   && !itemRoot.networkActive)
 
         Behavior on color { ColorAnimation { duration: 140 } }
         Behavior on height {
@@ -139,7 +177,7 @@ WidgetPanel {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: Network.connectToWifiNetwork(itemRoot.wifiNetwork)
+            onClicked: NetworkService.connectToWifiNetwork(itemRoot.wifiNetwork)
         }
 
         ColumnLayout {
@@ -185,8 +223,15 @@ WidgetPanel {
                 }
 
                 Text {
-                    visible: itemRoot.networkSecure || itemRoot.networkActive || Network.wifiConnectTarget === itemRoot.wifiNetwork
-                    text: itemRoot.networkActive ? "check" : Network.wifiConnectTarget === itemRoot.wifiNetwork ? "settings_ethernet" : "lock"
+                    visible: itemRoot.networkSecure || itemRoot.networkActive
+                        || (NetworkService.wifiConnectTarget
+                            && NetworkService.wifiConnectTarget.ssid === itemRoot.networkSsid)
+                    text: itemRoot.networkActive
+                        ? "check"
+                        : (NetworkService.wifiConnectTarget
+                            && NetworkService.wifiConnectTarget.ssid === itemRoot.networkSsid)
+                            ? "settings_ethernet"
+                            : "lock"
                     font.family: root.mdFont
                     font.pixelSize: 22
                     color: itemRoot.networkActive ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer1
@@ -230,7 +275,11 @@ WidgetPanel {
                         placeholderText: "密码"
                         echoMode: TextInput.Password
                         inputMethodHints: Qt.ImhSensitiveData
-                        onAccepted: Network.changePassword(itemRoot.wifiNetwork, text)
+                        onAccepted: {
+                            const password = text;
+                            text = "";
+                            NetworkService.changePassword(itemRoot.wifiNetwork, password);
+                        }
                     }
 
                     RowLayout {
@@ -243,12 +292,17 @@ WidgetPanel {
                             onClicked: {
                                 passwordField.text = "";
                                 passwordField.focus = false;
-                                Network.cancelPasswordRequest(itemRoot.wifiNetwork);
+                                NetworkService.cancelPasswordRequest(itemRoot.wifiNetwork);
                             }
                         }
                         DialogActionButton {
                             text: "连接"
-                            onClicked: Network.changePassword(itemRoot.wifiNetwork, passwordField.text)
+                            onClicked: {
+                                const password = passwordField.text;
+                                passwordField.text = "";
+                                passwordField.focus = false;
+                                NetworkService.changePassword(itemRoot.wifiNetwork, password);
+                            }
                         }
                     }
                 }
@@ -288,7 +342,7 @@ WidgetPanel {
                         text: "打开网络门户"
                         filled: true
                         onClicked: {
-                            Network.openPublicWifiPortal();
+                            NetworkService.openPublicWifiPortal();
                             WidgetState.qsOpen = false;
                         }
                     }

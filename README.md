@@ -5,6 +5,11 @@
 
 这是我的 Quickshell 桌面 shell 配置目录，放置在标准的 `~/.config/quickshell` 路径下。仓库包含主入口 `shell.qml`、`AppShell.qml`、`Modules/` 业务模块、`Widgets/` 可复用控件、`Common/` 全局基础设施、共享资源，以及 `core/` 下用于向 QML 暴露系统监控和天气数据的 Qt/C++ 自制插件源码。
 
+网络、蓝牙与空闲策略统一通过 `Services/` 下的项目门面访问。基础状态分别来自
+`Quickshell.Networking`、`Quickshell.Bluetooth` 和 `Quickshell.Wayland`；界面组件不直接解析命令行状态。
+空闲策略默认启用 10 分钟锁屏和 15 分钟关闭显示器，调暗与自动挂起默认关闭，可在
+`IdleService` 中分别配置各阶段的启用状态、超时和 inhibitor 行为。
+
 ### 预览
 Keystone 媒体
 <p align="center">
