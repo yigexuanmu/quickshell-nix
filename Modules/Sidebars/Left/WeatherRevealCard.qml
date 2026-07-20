@@ -9,18 +9,22 @@ Item {
     property real viewportHeight: 0
     property bool activationEnabled: true
     property int staggerIndex: 0
+    property real entryTravel: 120
 
     readonly property bool hasRevealed: revealStarted
     readonly property int entryDelay: Math.max(0, staggerIndex) * 200
     readonly property int entryDuration: Math.max(250, 500 - Math.max(0, staggerIndex) * 50)
+    readonly property bool layoutReady: width > 0 && height > 0 && contentTop > 0
+    readonly property real revealDepth: Math.min(height, Math.max(0, entryTravel))
     readonly property bool thresholdCrossed: activationEnabled
+                                                 && layoutReady
                                                  && viewportHeight > 0
-                                                 && contentTop < viewportContentY + viewportHeight
+                                                 && contentTop + revealDepth <= viewportContentY + viewportHeight
 
     property bool animationStarted: false
     property bool revealStarted: false
     property real visualOpacity: 0
-    property real entryOffset: 120
+    property real entryOffset: entryTravel
     property real entryScale: 1.025
 
     default property alias content: visualLayer.data
@@ -37,7 +41,7 @@ Item {
         revealStarted = false
         animationStarted = false
         visualOpacity = 0
-        entryOffset = 120
+        entryOffset = entryTravel
         entryScale = 1.025
     }
 
@@ -88,7 +92,7 @@ Item {
             NumberAnimation {
                 target: root
                 property: "entryOffset"
-                from: 120
+                from: root.entryTravel
                 to: 0
                 duration: root.entryDuration
                 easing.type: Easing.BezierSpline
