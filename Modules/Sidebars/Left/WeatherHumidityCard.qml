@@ -10,6 +10,10 @@ WeatherInsightCard {
     property string humidityText: "--"
     property string dewPointText: "--"
     property color accent: "#6f649b"
+    property bool animationEnabled: false
+    property bool animationActive: true
+
+    readonly property real dewPointValue: numericTextValue(dewPointText)
 
     icon: ""
     title: ""
@@ -23,6 +27,37 @@ WeatherInsightCard {
     function humidityPercentValue() {
         if (isNaN(root.humidityValue)) return NaN
         return root.humidityValue <= 1.0 ? root.humidityValue * 100.0 : root.humidityValue
+    }
+
+    function numericTextValue(text) {
+        const match = (text || "").match(/[-+]?\d+(?:\.\d+)?/)
+        return match ? Number(match[0]) : NaN
+    }
+
+    function animatedHumidityText() {
+        return isNaN(humidityAnimation.currentValue)
+                ? "--"
+                : Math.round(humidityAnimation.currentValue) + "%"
+    }
+
+    function animatedDewPointText() {
+        return isNaN(dewPointAnimation.currentValue)
+                ? "--"
+                : Math.round(dewPointAnimation.currentValue) + "°"
+    }
+
+    WeatherAnimatedValue {
+        id: humidityAnimation
+        targetValue: root.humidityPercentValue()
+        enabled: root.animationEnabled
+        active: root.animationActive
+    }
+
+    WeatherAnimatedValue {
+        id: dewPointAnimation
+        targetValue: root.dewPointValue
+        enabled: root.animationEnabled
+        active: root.animationActive
     }
 
     function waveBucket() {
@@ -108,7 +143,7 @@ WeatherInsightCard {
         anchors.top: parent.top
         anchors.leftMargin: 18
         anchors.topMargin: 72
-        text: root.humidityText
+        text: root.animatedHumidityText()
         color: Appearance.colors.colOnWeatherCardSurface
         font.family: "JetBrainsMono Nerd Font"
         font.pixelSize: 58
@@ -131,7 +166,7 @@ WeatherInsightCard {
 
             Text {
                 anchors.centerIn: parent
-                text: root.dewPointText
+                text: root.animatedDewPointText()
                 color: Appearance.colors.colOnPrimaryContainer
                 font.family: "JetBrainsMono Nerd Font"
                 font.pixelSize: 17

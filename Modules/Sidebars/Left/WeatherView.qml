@@ -515,105 +515,218 @@ Item {
                 }
 
                 RowLayout {
+                    id: precipitationWindRow
                     width: parent.width
                     spacing: 10
 
-                    WeatherPrecipitationCard {
+                    WeatherRevealCard {
+                        id: precipitationReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        valueText: precipitationValueText()
-                        descriptionText: precipitationDescriptionText()
+                        contentTop: precipitationWindRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 0
+
+                        WeatherPrecipitationCard {
+                            anchors.fill: parent
+                            valueText: precipitationValueText()
+                            descriptionText: precipitationDescriptionText()
+                            animationEnabled: true
+                            animationActive: precipitationReveal.animationStarted
+                        }
                     }
 
-                    WeatherWindCard {
+                    WeatherRevealCard {
+                        id: windReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        directionDegrees: WeatherPlugin.currentWindDirection
-                        valueText: fmtSpeed(WeatherPlugin.currentWindSpeedMs)
-                        detailText: "阵风 " + fmtSpeed(WeatherPlugin.currentWindGustsMs) + " · " + directionLabel(WeatherPlugin.currentWindDirection)
-                        accent: windAccent(WeatherPlugin.currentWindSpeedMs)
+                        contentTop: precipitationWindRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 1
+
+                        WeatherWindCard {
+                            anchors.fill: parent
+                            directionDegrees: WeatherPlugin.currentWindDirection
+                            valueText: fmtSpeed(WeatherPlugin.currentWindSpeedMs)
+                            detailText: "阵风 " + fmtSpeed(WeatherPlugin.currentWindGustsMs) + " · " + directionLabel(WeatherPlugin.currentWindDirection)
+                            accent: windAccent(WeatherPlugin.currentWindSpeedMs)
+                            animationEnabled: true
+                            animationActive: windReveal.animationStarted
+                        }
                     }
                 }
 
                 RowLayout {
+                    id: aqiHumidityRow
                     width: parent.width
                     spacing: 10
 
-                    WeatherAqiCard {
+                    WeatherRevealCard {
+                        id: aqiReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        aqiValue: aqiSummary().value
-                        levelText: aqiSummary().level
-                        accent: aqiSummary().color
+                        contentTop: aqiHumidityRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 0
+
+                        WeatherAqiCard {
+                            anchors.fill: parent
+                            aqiValue: aqiSummary().value
+                            levelText: aqiSummary().level
+                            accent: aqiSummary().color
+                            animationEnabled: true
+                            animationActive: aqiReveal.animationStarted
+                        }
                     }
 
-                    WeatherHumidityCard {
+                    WeatherRevealCard {
+                        id: humidityReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        humidityValue: WeatherPlugin.currentRelativeHumidity
-                        humidityText: fmtPercent(WeatherPlugin.currentRelativeHumidity)
-                        dewPointText: fmtTemp(WeatherPlugin.currentDewPointC)
-                        accent: humidityWaveAccent()
+                        contentTop: aqiHumidityRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 1
+
+                        WeatherHumidityCard {
+                            anchors.fill: parent
+                            humidityValue: WeatherPlugin.currentRelativeHumidity
+                            humidityText: fmtPercent(WeatherPlugin.currentRelativeHumidity)
+                            dewPointText: fmtTemp(WeatherPlugin.currentDewPointC)
+                            accent: humidityWaveAccent()
+                            animationEnabled: true
+                            animationActive: humidityReveal.animationStarted
+                        }
                     }
                 }
 
                 RowLayout {
+                    id: uvVisibilityRow
                     width: parent.width
                     spacing: 10
 
-                    WeatherUvCard {
+                    WeatherRevealCard {
+                        id: uvReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        value: WeatherPlugin.currentUvIndex
-                        level: uvLevel(WeatherPlugin.currentUvIndex)
-                        activeIndex: uvIndexBucket(WeatherPlugin.currentUvIndex)
+                        contentTop: uvVisibilityRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 0
+
+                        WeatherUvCard {
+                            anchors.fill: parent
+                            value: WeatherPlugin.currentUvIndex
+                            level: uvLevel(WeatherPlugin.currentUvIndex)
+                            activeIndex: uvIndexBucket(WeatherPlugin.currentUvIndex)
+                            animationEnabled: true
+                            animationActive: uvReveal.animationStarted
+                        }
                     }
 
-                    WeatherVisibilityCard {
+                    WeatherRevealCard {
+                        id: visibilityReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        visibilityMeters: WeatherPlugin.currentVisibilityM
+                        contentTop: uvVisibilityRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 1
+
+                        WeatherVisibilityCard {
+                            anchors.fill: parent
+                            visibilityMeters: WeatherPlugin.currentVisibilityM
+                            animationEnabled: true
+                            animationActive: visibilityReveal.animationStarted
+                        }
                     }
                 }
 
                 RowLayout {
+                    id: pressureSunRow
                     width: parent.width
                     spacing: 10
 
-                    WeatherPressureCard {
+                    WeatherRevealCard {
+                        id: pressureReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        pressureValue: WeatherPlugin.currentPressureHpa
-                        valueText: pressureValueText(WeatherPlugin.currentPressureHpa)
-                        unitText: "hPa"
+                        contentTop: pressureSunRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 0
+
+                        WeatherPressureCard {
+                            anchors.fill: parent
+                            pressureValue: WeatherPlugin.currentPressureHpa
+                            valueText: pressureValueText(WeatherPlugin.currentPressureHpa)
+                            unitText: "hPa"
+                            animationEnabled: true
+                            animationActive: pressureReveal.animationStarted
+                        }
                     }
 
-                    WeatherAstroCard {
+                    WeatherRevealCard {
+                        id: sunReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        moon: false
-                        riseText: fmtTime(today().sunrise)
-                        setText: fmtTime(today().sunset)
-                        riseEpoch: today().sunrise || 0
-                        setEpoch: today().sunset || 0
-                        currentEpoch: root.currentEpoch
+                        contentTop: pressureSunRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 1
+
+                        WeatherAstroCard {
+                            anchors.fill: parent
+                            moon: false
+                            riseText: fmtTime(today().sunrise)
+                            setText: fmtTime(today().sunset)
+                            riseEpoch: today().sunrise || 0
+                            setEpoch: today().sunset || 0
+                            currentEpoch: root.currentEpoch
+                            animationEnabled: true
+                            animationActive: sunReveal.animationStarted
+                        }
                     }
                 }
 
                 RowLayout {
+                    id: moonRow
                     width: parent.width
                     spacing: 10
 
-                    WeatherAstroCard {
+                    WeatherRevealCard {
+                        id: moonReveal
                         Layout.preferredWidth: (parent.width - parent.spacing) / 2
                         Layout.preferredHeight: Layout.preferredWidth
-                        moon: true
-                        riseText: fmtTime(today().moonrise)
-                        setText: fmtTime(today().moonset)
-                        riseEpoch: today().moonrise || 0
-                        setEpoch: today().moonset || 0
-                        currentEpoch: root.currentEpoch
-                        phaseAngle: today().moonPhaseAngle || 0
+                        contentTop: moonRow.y
+                        viewportContentY: flick.contentY
+                        viewportHeight: flick.height
+                        activationEnabled: root.visible
+                        staggerIndex: 0
+
+                        WeatherAstroCard {
+                            anchors.fill: parent
+                            moon: true
+                            riseText: fmtTime(today().moonrise)
+                            setText: fmtTime(today().moonset)
+                            riseEpoch: today().moonrise || 0
+                            setEpoch: today().moonset || 0
+                            currentEpoch: root.currentEpoch
+                            phaseAngle: today().moonPhaseAngle || 0
+                            animationEnabled: true
+                            animationActive: moonReveal.animationStarted
+                        }
                     }
                 }
 

@@ -9,11 +9,16 @@ WeatherInsightCard {
     property string valueText: "--"
     property string detailText: ""
     property color accent: "#4d8d7b"
+    property bool animationEnabled: false
+    property bool animationActive: true
 
     readonly property var parsedSpeed: parseSpeedText(valueText)
     readonly property string displaySpeed: parsedSpeed.number
     readonly property string displayUnit: parsedSpeed.unit
     readonly property string displayDetail: normalizedDetail(detailText)
+    readonly property var parsedDetail: parseAnimatedDetail(displayDetail)
+    readonly property real speedValue: displaySpeed === "--" ? NaN : Number(displaySpeed)
+    readonly property real gustValue: parsedDetail.valid ? parsedDetail.value : NaN
     readonly property bool hasDirection: directionDegrees >= 0 && directionDegrees <= 360
     readonly property color ink: Appearance.colors.colOnWeatherCardSurface
     readonly property color mutedInk: Appearance.colors.colOnWeatherCardSurfaceVariant
@@ -64,6 +69,52 @@ WeatherInsightCard {
 
         label = label.replace(/(\d)\.0(\s|$)/g, "$1$2")
         return label
+    }
+
+    function parseAnimatedDetail(text) {
+        const match = (text || "").match(/^([^-\d]*)([-+]?\d+(?:\.\d+)?)(.*)$/)
+        if (!match)
+            return { valid: false, prefix: "", value: NaN, decimals: 0, suffix: text || "" }
+
+        const decimalIndex = match[2].indexOf(".")
+        return {
+            valid: true,
+            prefix: match[1],
+            value: Number(match[2]),
+            decimals: decimalIndex >= 0 ? match[2].length - decimalIndex - 1 : 0,
+            suffix: match[3]
+        }
+    }
+
+    function animatedSpeedText() {
+        if (isNaN(speedAnimation.currentValue))
+            return "--"
+
+        const decimalIndex = root.displaySpeed.indexOf(".")
+        const decimals = decimalIndex >= 0 ? root.displaySpeed.length - decimalIndex - 1 : 0
+        return compactNumber(Number(speedAnimation.currentValue).toFixed(decimals))
+    }
+
+    function animatedDetailText() {
+        if (!root.parsedDetail.valid || isNaN(gustAnimation.currentValue))
+            return root.displayDetail
+
+        const number = compactNumber(Number(gustAnimation.currentValue).toFixed(root.parsedDetail.decimals))
+        return root.parsedDetail.prefix + number + root.parsedDetail.suffix
+    }
+
+    WeatherAnimatedValue {
+        id: speedAnimation
+        targetValue: root.speedValue
+        enabled: root.animationEnabled
+        active: root.animationActive
+    }
+
+    WeatherAnimatedValue {
+        id: gustAnimation
+        targetValue: root.gustValue
+        enabled: root.animationEnabled
+        active: root.animationActive
     }
 
     Row {
@@ -151,7 +202,7 @@ WeatherInsightCard {
                 id: speedNumber
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
-                text: root.displaySpeed
+                text: root.animatedSpeedText()
                 color: root.ink
                 font.pixelSize: root.speedNumberSize
                 font.weight: Font.Light
@@ -178,7 +229,7 @@ WeatherInsightCard {
         anchors.bottomMargin: 36
         width: parent.width * 0.74
         horizontalAlignment: Text.AlignHCenter
-        text: root.displayDetail
+        text: root.animatedDetailText()
         color: root.ink
         font.pixelSize: 14
         font.bold: true

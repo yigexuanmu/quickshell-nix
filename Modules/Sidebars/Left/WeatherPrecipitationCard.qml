@@ -7,6 +7,8 @@ WeatherInsightCard {
 
     property string valueText: "--"
     property string descriptionText: ""
+    property bool animationEnabled: false
+    property bool animationActive: true
 
     readonly property var parsedValue: parseValueText(valueText)
     readonly property string displayValue: parsedValue.number
@@ -16,6 +18,7 @@ WeatherInsightCard {
     readonly property color mutedInk: Appearance.colors.colOnWeatherCardSurfaceVariant
     readonly property real valueNumberSize: Math.round(width * 0.28)
     readonly property real valueUnitSize: Math.round(width * 0.12)
+    readonly property real numericValue: displayValue === "--" ? NaN : Number(displayValue)
 
     icon: ""
     title: ""
@@ -54,6 +57,22 @@ WeatherInsightCard {
         label = label.replace("总降水", "降水")
         label = label.replace("总量", "")
         return label
+    }
+
+    function animatedValueText() {
+        if (isNaN(amountAnimation.currentValue))
+            return "--"
+
+        const decimalIndex = root.displayValue.indexOf(".")
+        const decimals = decimalIndex >= 0 ? root.displayValue.length - decimalIndex - 1 : 0
+        return Number(amountAnimation.currentValue).toFixed(decimals)
+    }
+
+    WeatherAnimatedValue {
+        id: amountAnimation
+        targetValue: root.numericValue
+        enabled: root.animationEnabled
+        active: root.animationActive
     }
 
     Row {
@@ -110,7 +129,7 @@ WeatherInsightCard {
                 id: valueNumber
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
-                text: root.displayValue
+                text: root.animatedValueText()
                 color: root.ink
                 font.pixelSize: root.valueNumberSize
                 font.weight: Font.Light

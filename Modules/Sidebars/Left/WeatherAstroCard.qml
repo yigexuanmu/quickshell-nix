@@ -13,6 +13,12 @@ Rectangle {
     property real setEpoch: 0
     property real currentEpoch: Math.floor(Date.now() / 1000)
     property real phaseAngle: 0
+    property bool animationEnabled: false
+    property bool animationActive: true
+    property bool animationHasRun: false
+    property real displayProgress: 0
+    property real animatedPhaseAngle: 0
+    property real iconRotation: 0
 
     readonly property color cardInk: Appearance.colors.colOnWeatherCardSurface
     readonly property color titleInk: Appearance.colors.colOnWeatherCardSurfaceVariant
@@ -26,13 +32,12 @@ Rectangle {
     readonly property color moonGlowBottom: Qt.rgba(0.31, 0.28, 0.40, 0.03)
 
     readonly property real progressTarget: progressFromTimes()
-    readonly property real displayProgress: progressTarget
 
     readonly property real trackLeft: width * 0.14
     readonly property real trackRight: width * 0.86
     readonly property real trackBaseY: height * 0.58
     readonly property real trackTopY: height * 0.30
-    readonly property point markerPoint: cubicPoint(displayProgress)
+    readonly property point markerPoint: cubicPoint(Math.max(0, Math.min(1, displayProgress)))
 
     radius: 30
     color: Appearance.colors.colWeatherCardSurface
@@ -94,6 +99,76 @@ Rectangle {
         return "残月"
     }
 
+    function pathAnimationDuration() {
+        return Math.min(4000, Math.max(1000, 1000 + 3000 * root.progressTarget))
+    }
+
+    function phaseAnimationDuration() {
+        const normalized = Math.max(0, Math.min(360, root.phaseAngle))
+        return Math.min(2000, 1000 + normalized / 360 * 1000)
+    }
+
+    function targetIconRotation() {
+        const turns = root.moon ? 4 : 7
+        const total = 360 * turns * root.progressTarget
+        const completedTurns = total - total % 360
+        return root.moon ? -completedTurns : completedTurns
+    }
+
+    function syncAnimationState() {
+        if (!root.animationEnabled) {
+            pathEntryAnimation.stop()
+            phaseEntryAnimation.stop()
+            progressUpdateAnimation.stop()
+            phaseUpdateAnimation.stop()
+            root.displayProgress = root.progressTarget
+            root.animatedPhaseAngle = root.phaseAngle
+            root.iconRotation = 0
+            root.animationHasRun = false
+            return
+        }
+
+        if (!root.animationActive) {
+            pathEntryAnimation.stop()
+            phaseEntryAnimation.stop()
+            progressUpdateAnimation.stop()
+            phaseUpdateAnimation.stop()
+            root.displayProgress = 0
+            root.animatedPhaseAngle = 0
+            root.iconRotation = 0
+            root.animationHasRun = false
+            return
+        }
+
+        if (!root.animationHasRun) {
+            root.animationHasRun = true
+            root.displayProgress = 0
+            root.animatedPhaseAngle = 0
+            root.iconRotation = 0
+            pathEntryAnimation.restart()
+            if (root.moon && root.phaseAngle > 0)
+                phaseEntryAnimation.restart()
+            else
+                root.animatedPhaseAngle = root.phaseAngle
+        }
+    }
+
+    function updateProgressTarget() {
+        if (!root.animationEnabled) {
+            root.displayProgress = root.progressTarget
+        } else if (root.animationActive && root.animationHasRun && !pathEntryAnimation.running) {
+            progressUpdateAnimation.restart()
+        }
+    }
+
+    function updatePhaseTarget() {
+        if (!root.animationEnabled) {
+            root.animatedPhaseAngle = root.phaseAngle
+        } else if (root.animationActive && root.animationHasRun && !phaseEntryAnimation.running) {
+            phaseUpdateAnimation.restart()
+        }
+    }
+
     function requestArtPaint() {
         artCanvas.requestPaint()
     }
@@ -106,8 +181,73 @@ Rectangle {
     onMoonChanged: requestArtPaint()
     onWidthChanged: requestArtPaint()
     onHeightChanged: requestArtPaint()
-    onPhaseAngleChanged: requestMoonPhasePaint()
-    onProgressTargetChanged: requestArtPaint()
+    onAnimatedPhaseAngleChanged: requestMoonPhasePaint()
+    onProgressTargetChanged: updateProgressTarget()
+    onPhaseAngleChanged: updatePhaseTarget()
+    onAnimationEnabledChanged: syncAnimationState()
+    onAnimationActiveChanged: syncAnimationState()
+    Component.onCompleted: syncAnimationState()
+
+    ParallelAnimation {
+        id: pathEntryAnimation
+
+        NumberAnimation {
+            target: root
+            property: "displayProgress"
+            from: 0
+            to: root.progressTarget
+            duration: root.pathAnimationDuration()
+            easing.type: Easing.OutBack
+            easing.overshoot: 1
+        }
+
+        NumberAnimation {
+            target: root
+            property: "iconRotation"
+            from: 0
+            to: root.targetIconRotation()
+            duration: root.pathAnimationDuration()
+            easing.type: Easing.OutBack
+            easing.overshoot: 1
+        }
+
+        onFinished: {
+            root.displayProgress = root.progressTarget
+            root.iconRotation = root.targetIconRotation()
+        }
+    }
+
+    NumberAnimation {
+        id: phaseEntryAnimation
+        target: root
+        property: "animatedPhaseAngle"
+        from: 0
+        to: root.phaseAngle
+        duration: root.phaseAnimationDuration()
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Animations.curves.emphasizedDecel
+        onFinished: root.animatedPhaseAngle = root.phaseAngle
+    }
+
+    NumberAnimation {
+        id: progressUpdateAnimation
+        target: root
+        property: "displayProgress"
+        to: root.progressTarget
+        duration: 500
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Animations.curves.emphasizedDecel
+    }
+
+    NumberAnimation {
+        id: phaseUpdateAnimation
+        target: root
+        property: "animatedPhaseAngle"
+        to: root.phaseAngle
+        duration: 500
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Animations.curves.emphasizedDecel
+    }
 
     Row {
         anchors.left: parent.left
@@ -243,6 +383,7 @@ Rectangle {
         night: root.moon
         style: "fill"
         animated: false
+        rotation: root.iconRotation
         smooth: true
         playing: false
         visible: root.displayProgress > 0.001
@@ -297,7 +438,7 @@ Rectangle {
                 const cx = width / 2
                 const cy = height / 2
                 const r = width / 2 - 1.5
-                const angle = ((root.phaseAngle % 360) + 360) % 360
+                const angle = ((root.animatedPhaseAngle % 360) + 360) % 360
                 const light = "#efe6c7"
                 const dark = "#433d54"
                 const stroke = "rgba(234,228,243,0.78)"

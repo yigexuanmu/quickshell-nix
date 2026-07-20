@@ -8,12 +8,21 @@ Item {
     property real aqiValue: NaN
     property string levelText: "--"
     property color accent: "#00e59b"
+    property bool animationEnabled: false
+    property bool animationActive: true
 
     readonly property real cardSize: Math.min(width, height)
     readonly property color ink: Appearance.colors.colOnWeatherCardSurface
     readonly property color mutedInk: Appearance.colors.colOnWeatherCardSurfaceVariant
     readonly property color cardFill: Appearance.colors.colWeatherCardSurface
     readonly property color trackTint: Qt.rgba(Qt.darker(accent, 2.9).r, Qt.darker(accent, 2.9).g, Qt.darker(accent, 2.9).b, 0.58)
+
+    WeatherAnimatedValue {
+        id: aqiAnimation
+        targetValue: root.aqiValue
+        enabled: root.animationEnabled
+        active: root.animationActive
+    }
 
     Rectangle {
         id: card
@@ -27,7 +36,7 @@ Item {
             width: parent.width * 0.93
             height: width
             anchors.centerIn: parent
-            value: isNaN(root.aqiValue) ? 0 : root.aqiValue
+            value: isNaN(aqiAnimation.currentValue) ? 0 : aqiAnimation.currentValue
             maximum: 250
             progressColor: root.accent
             trackColor: root.trackTint
@@ -75,7 +84,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: -12
-            text: isNaN(root.aqiValue) ? "--" : Math.round(root.aqiValue)
+            text: isNaN(aqiAnimation.currentValue) ? "--" : Math.round(aqiAnimation.currentValue)
             color: root.ink
             font.pixelSize: Math.round(parent.width * 0.29)
             font.weight: Font.Light

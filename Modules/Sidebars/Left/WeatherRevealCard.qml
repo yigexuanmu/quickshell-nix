@@ -1,0 +1,117 @@
+import QtQuick
+import qs.Common
+
+Item {
+    id: root
+
+    property real contentTop: 0
+    property real viewportContentY: 0
+    property real viewportHeight: 0
+    property bool activationEnabled: true
+    property int staggerIndex: 0
+
+    readonly property bool hasRevealed: revealStarted
+    readonly property int entryDelay: Math.max(0, staggerIndex) * 200
+    readonly property int entryDuration: Math.max(250, 500 - Math.max(0, staggerIndex) * 50)
+    readonly property bool thresholdCrossed: activationEnabled
+                                                 && viewportHeight > 0
+                                                 && contentTop < viewportContentY + viewportHeight
+
+    property bool animationStarted: false
+    property bool revealStarted: false
+    property real visualOpacity: 0
+    property real entryOffset: 120
+    property real entryScale: 1.025
+
+    default property alias content: visualLayer.data
+
+    function maybeReveal() {
+        if (thresholdCrossed && !revealStarted) {
+            revealStarted = true
+            entryAnimation.restart()
+        }
+    }
+
+    function reset() {
+        entryAnimation.stop()
+        revealStarted = false
+        animationStarted = false
+        visualOpacity = 0
+        entryOffset = 120
+        entryScale = 1.025
+    }
+
+    onThresholdCrossedChanged: maybeReveal()
+    onActivationEnabledChanged: maybeReveal()
+    Component.onCompleted: Qt.callLater(maybeReveal)
+
+    Item {
+        id: visualLayer
+        anchors.fill: parent
+        opacity: root.visualOpacity
+
+        transform: [
+            Translate {
+                y: root.entryOffset
+            },
+            Scale {
+                origin.x: visualLayer.width / 2
+                origin.y: visualLayer.height / 2
+                xScale: root.entryScale
+                yScale: root.entryScale
+            }
+        ]
+    }
+
+    SequentialAnimation {
+        id: entryAnimation
+
+        PauseAnimation {
+            duration: root.entryDelay
+        }
+
+        ScriptAction {
+            script: root.animationStarted = true
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "visualOpacity"
+                from: 0
+                to: 1
+                duration: root.entryDuration
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Animations.curves.expressiveDefaultEffects
+            }
+
+            NumberAnimation {
+                target: root
+                property: "entryOffset"
+                from: 120
+                to: 0
+                duration: root.entryDuration
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Animations.curves.expressiveDefaultSpatial
+            }
+
+            NumberAnimation {
+                target: root
+                property: "entryScale"
+                from: 1.025
+                to: 1
+                duration: root.entryDuration
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Animations.curves.standardDecel
+            }
+        }
+
+        ScriptAction {
+            script: {
+                root.visualOpacity = 1
+                root.entryOffset = 0
+                root.entryScale = 1
+            }
+        }
+    }
+}
