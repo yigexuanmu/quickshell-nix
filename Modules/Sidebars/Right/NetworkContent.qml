@@ -24,6 +24,8 @@ WidgetPanel {
     readonly property bool networkUsable: NetworkService.available
         && NetworkService.wifiAvailable
         && NetworkService.wifiEnabled
+    readonly property var savedWifiNetworks: NetworkService.savedWifiNetworks
+    readonly property var availableWifiNetworks: NetworkService.availableWifiNetworks
     readonly property bool linearLoading: refreshLoading || NetworkService.busy
     readonly property string stateMessage: {
         if (NetworkService.lastError.length > 0)
@@ -36,10 +38,6 @@ WidgetPanel {
             return "Wi-Fi 已被硬件开关或 rfkill 阻止";
         if (!NetworkService.wifiEnabled)
             return "Wi-Fi 已关闭";
-        if (!root.initialLoading
-                && !root.refreshLoading
-                && NetworkService.friendlyWifiNetworks.length === 0)
-            return "未发现可用网络";
         return "";
     }
 
@@ -49,7 +47,7 @@ WidgetPanel {
 
         initialLoadTimer.stop();
         root.initialLoadAttempted = true;
-        initialLoading = NetworkService.friendlyWifiNetworks.length === 0;
+        initialLoading = NetworkService.availableWifiNetworks.length === 0;
         if (initialLoading)
             initialLoadTimer.restart();
     }
@@ -97,6 +95,10 @@ WidgetPanel {
     }
 
     onIsActiveChanged: updateScanLease()
+    onAvailableWifiNetworksChanged: {
+        if (NetworkService.availableWifiNetworks.length > 0)
+            root.finishTransientLoading();
+    }
     Component.onCompleted: updateScanLease()
     Component.onDestruction: {
         if (scanLeaseAcquired)
@@ -106,11 +108,6 @@ WidgetPanel {
 
     Connections {
         target: NetworkService
-
-        function onFriendlyWifiNetworksChanged() {
-            if (NetworkService.friendlyWifiNetworks.length > 0)
-                root.finishTransientLoading();
-        }
 
         function onWifiEnabledChanged() {
             if (!NetworkService.wifiEnabled)
@@ -256,65 +253,98 @@ WidgetPanel {
             message: root.stateMessage
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            visible: root.networkUsable
-
-            Text {
-                Layout.fillWidth: true
-                text: "可用网络"
-                color: Appearance.colors.colOnLayer2
-                font.family: Sizes.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                visible: !root.initialLoading
-                text: NetworkService.friendlyWifiNetworks.length + " 个"
-                color: Appearance.colors.colOnLayer1
-                font.family: Sizes.fontFamilyMono
-                font.pixelSize: 12
-            }
-        }
-
-        Item {
+        StyledFlickable {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: root.networkUsable
+            contentWidth: width
+            contentHeight: networkContent.implicitHeight
 
-            StyledListView {
-                id: wifiList
+            ColumnLayout {
+                id: networkContent
 
-                anchors.fill: parent
-                visible: !root.initialLoading
-                spacing: Appearance.spacing.xSmall
-                model: NetworkService.friendlyWifiNetworks
-
-                delegate: WifiNetworkItem {
-                    required property var modelData
-                    width: ListView.view.width
-                    wifiNetwork: modelData
-                }
-            }
-
-            Column {
-                anchors.centerIn: parent
-                visible: root.initialLoading
+                width: parent.width - Appearance.spacing.small
                 spacing: Appearance.spacing.small
 
-                MaterialLoadingIndicator {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    running: root.initialLoading
-                    accessibleName: "正在查找可用网络"
+                SettingsSection {
+                    Layout.fillWidth: true
+                    visible: NetworkService.savedWifiNetworks.length > 0
+                    title: "已保存网络"
+                    supportingText: NetworkService.savedWifiNetworks.length + " 个网络"
+
+                    Repeater {
+                        model: NetworkService.savedWifiNetworks
+
+                        WifiNetworkItem {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            wifiNetwork: modelData
+                        }
+                    }
                 }
 
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "正在查找可用网络"
-                    color: Appearance.colors.colOnLayer1
-                    font.family: Sizes.fontFamily
-                    font.pixelSize: 12
+                SettingsSection {
+                    Layout.fillWidth: true
+                    title: "可选网络"
+                    supportingText: root.initialLoading
+                        ? "正在获取扫描结果"
+                        : NetworkService.availableWifiNetworks.length + " 个网络"
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: root.initialLoading ? 116 : 0
+                        visible: root.initialLoading
+                        opacity: root.initialLoading ? 1 : 0
+                        clip: true
+
+                        Behavior on Layout.preferredHeight { ElementMoveAnimation {} }
+                        Behavior on opacity { ElementMoveAnimation {} }
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: Appearance.spacing.small
+
+                            MaterialLoadingIndicator {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                running: root.initialLoading
+                                accessibleName: "正在查找可选网络"
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "正在查找可选网络"
+                                color: Appearance.colors.colOnLayer1
+                                font.family: Sizes.fontFamily
+                                font.pixelSize: 12
+                            }
+                        }
+                    }
+
+                    Repeater {
+                        model: NetworkService.availableWifiNetworks
+
+                        WifiNetworkItem {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            wifiNetwork: modelData
+                        }
+                    }
+
+                    SettingsRow {
+                        Layout.fillWidth: true
+                        visible: !root.initialLoading
+                            && !root.refreshLoading
+                            && NetworkService.availableWifiNetworks.length === 0
+                        iconName: "search_off"
+                        title: "未发现可选网络"
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Appearance.spacing.small
                 }
             }
         }
@@ -397,7 +427,8 @@ WidgetPanel {
             ? passwordContent.implicitHeight + Appearance.spacing.medium
             : 0
 
-        height: 64 + promptHeight
+        implicitHeight: 64 + promptHeight
+        height: implicitHeight
         radius: Appearance.rounding.normal
         clip: true
         color: networkActive || networkAskingPassword

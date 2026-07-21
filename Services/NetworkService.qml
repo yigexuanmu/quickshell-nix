@@ -75,8 +75,11 @@ Singleton {
             return a.known ? -1 : 1;
         return b.strength - a.strength;
     })
-    readonly property var savedWifiConnections: accessPoints
+    readonly property var savedWifiNetworks: friendlyWifiNetworks
         .filter(network => network.known)
+    readonly property var availableWifiNetworks: friendlyWifiNetworks
+        .filter(network => !network.known)
+    readonly property var savedWifiConnections: savedWifiNetworks
         .map(network => ({
             "ssid": network.ssid,
             "deviceName": network.deviceName
