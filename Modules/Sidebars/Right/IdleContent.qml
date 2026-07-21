@@ -10,11 +10,13 @@ import qs.Widgets.common
 WidgetPanel {
     id: panelRoot
 
-    title: "空闲与保持唤醒"
-    icon: "coffee"
+    title: "空闲管理"
+    icon: "schedule"
     showBackButton: true
     backAction: () => WidgetState.qsView = "settings"
 
+    property bool isActive: WidgetState.qsOpen && WidgetState.qsView === "idle"
+    property string expandedStage: ""
     property real pendingDimFraction: IdleService.dimFraction
     readonly property var timeoutPresetSeconds: [60, 120, 300, 600, 900, 1800, 3600, 7200]
 
@@ -47,9 +49,14 @@ WidgetPanel {
 
     function policySummary() {
         if (!IdleService.policyEnabled)
-            return "自动空闲动作已暂停";
+            return "已暂停";
         const enabledCount = IdleService.stages.filter(stage => stage.enabled).length;
-        return enabledCount + " 个阶段已启用";
+        return enabledCount + " 项开启";
+    }
+
+    onIsActiveChanged: {
+        if (!isActive)
+            expandedStage = "";
     }
 
     Timer {
@@ -96,16 +103,11 @@ WidgetPanel {
 
                 SettingsSection {
                     Layout.fillWidth: true
-                    title: "保持唤醒"
-                    supportingText: "使用 Wayland IdleInhibitor 阻止遵循 inhibitor 的空闲阶段"
 
                     SettingsRow {
                         Layout.fillWidth: true
-                        iconName: IdleService.inhibited ? "coffee" : "bedtime"
-                        title: IdleService.inhibited ? "正在保持唤醒" : "允许正常休眠"
-                        supportingText: IdleService.inhibited
-                            ? "调暗和显示器关闭状态会立即恢复"
-                            : "空闲策略将按下方设定执行"
+                        iconName: "coffee"
+                        title: "保持唤醒"
                         highlighted: IdleService.inhibited
 
                         trailing: StyledSwitch {
@@ -116,17 +118,11 @@ WidgetPanel {
                             onToggled: IdleService.setInhibited(checked)
                         }
                     }
-                }
-
-                SettingsSection {
-                    Layout.fillWidth: true
-                    title: "空闲策略"
-                    supportingText: "各阶段独立计时；关闭总开关不会丢失阶段配置"
 
                     SettingsRow {
                         Layout.fillWidth: true
                         iconName: "schedule"
-                        title: "启用自动空闲动作"
+                        title: "自动空闲"
                         supportingText: panelRoot.policySummary()
                         highlighted: IdleService.policyEnabled
 
@@ -134,43 +130,44 @@ WidgetPanel {
                             scale: 0.78
                             checked: IdleService.policyEnabled
                             enabled: IdleService.policyReady
-                            Accessible.name: "自动空闲策略"
+                            Accessible.name: "自动空闲"
                             onToggled: IdleService.setPolicyEnabled(checked)
                         }
                     }
                 }
 
-                StageEditor {
+                SettingsSection {
                     Layout.fillWidth: true
-                    stageName: "dim"
-                    stageTitle: "调暗屏幕"
-                    stageIcon: "brightness_4"
-                    stageDescription: "空闲后降低当前显示器亮度"
-                    showDimFraction: true
-                }
+                    title: "空闲动作"
 
-                StageEditor {
-                    Layout.fillWidth: true
-                    stageName: "lock"
-                    stageTitle: "锁定会话"
-                    stageIcon: "lock"
-                    stageDescription: "触发 Clavis LockService；恢复活动不会自动解锁"
-                }
+                    StageEditor {
+                        Layout.fillWidth: true
+                        stageName: "dim"
+                        stageTitle: "调暗屏幕"
+                        stageIcon: "brightness_4"
+                        showDimFraction: true
+                    }
 
-                StageEditor {
-                    Layout.fillWidth: true
-                    stageName: "displayOff"
-                    stageTitle: "关闭显示器"
-                    stageIcon: "display_settings"
-                    stageDescription: "通过集中封装的 niri 动作关闭并在活动后恢复显示器"
-                }
+                    StageEditor {
+                        Layout.fillWidth: true
+                        stageName: "lock"
+                        stageTitle: "锁定会话"
+                        stageIcon: "lock"
+                    }
 
-                StageEditor {
-                    Layout.fillWidth: true
-                    stageName: "suspend"
-                    stageTitle: "挂起系统"
-                    stageIcon: "mode_standby"
-                    stageDescription: "超时后通过 systemd-logind 挂起当前会话"
+                    StageEditor {
+                        Layout.fillWidth: true
+                        stageName: "displayOff"
+                        stageTitle: "关闭显示器"
+                        stageIcon: "display_settings"
+                    }
+
+                    StageEditor {
+                        Layout.fillWidth: true
+                        stageName: "suspend"
+                        stageTitle: "挂起系统"
+                        stageIcon: "mode_standby"
+                    }
                 }
 
                 Item {
@@ -181,180 +178,179 @@ WidgetPanel {
         }
     }
 
-    component StageEditor: SettingsSection {
+    component StageEditor: Item {
         id: stageEditor
 
         required property string stageName
         required property string stageTitle
         required property string stageIcon
-        property string stageDescription: ""
         property bool showDimFraction: false
-        property bool expanded: false
+        readonly property bool expanded: panelRoot.expandedStage === stageName
         readonly property bool stageEnabled: !!IdleService[stageName + "Enabled"]
         readonly property real stageTimeout: Number(IdleService[stageName + "Timeout"] || 0)
         readonly property bool respectInhibitors: !!IdleService[stageName + "RespectInhibitors"]
 
-        SettingsRow {
-            Layout.fillWidth: true
-            iconName: stageEditor.stageIcon
-            title: stageEditor.stageTitle
-            supportingText: (stageEditor.stageEnabled
-                ? panelRoot.formatTimeout(stageEditor.stageTimeout)
-                : "已关闭")
-                + (panelRoot.stageActive(stageEditor.stageName) ? " · 已触发" : "")
-            interactive: true
-            highlighted: stageEditor.stageEnabled && IdleService.policyEnabled
-            onClicked: stageEditor.expanded = !stageEditor.expanded
+        implicitHeight: stageLayout.implicitHeight
 
-            trailing: RowLayout {
-                spacing: Appearance.spacing.xSmall
+        ColumnLayout {
+            id: stageLayout
 
-                MaterialSymbol {
-                    text: stageEditor.expanded ? "expand_less" : "expand_more"
-                    iconSize: 20
-                    color: Appearance.colors.colOnLayer1
-                }
+            width: parent.width
+            spacing: Appearance.spacing.xSmall
 
-                StyledSwitch {
-                    scale: 0.72
-                    checked: stageEditor.stageEnabled
-                    enabled: IdleService.policyReady
-                    Accessible.name: stageEditor.stageTitle
-                    onToggled: IdleService.configureStage(
-                        stageEditor.stageName,
-                        checked,
-                        stageEditor.stageTimeout,
-                        stageEditor.respectInhibitors
-                    )
-                }
-            }
-        }
+            SettingsRow {
+                Layout.fillWidth: true
+                iconName: stageEditor.stageIcon
+                title: stageEditor.stageTitle
+                supportingText: (stageEditor.stageEnabled
+                    ? panelRoot.formatTimeout(stageEditor.stageTimeout)
+                    : "已关闭")
+                    + (panelRoot.stageActive(stageEditor.stageName) ? " · 已触发" : "")
+                interactive: true
+                highlighted: stageEditor.stageEnabled && IdleService.policyEnabled
+                onClicked: panelRoot.expandedStage = stageEditor.expanded
+                    ? ""
+                    : stageEditor.stageName
 
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: stageEditor.expanded
-                ? stageDetails.implicitHeight + Appearance.spacing.small
-                : 0
-            opacity: stageEditor.expanded ? 1 : 0
-            clip: true
+                trailing: RowLayout {
+                    spacing: Appearance.spacing.xSmall
 
-            Behavior on Layout.preferredHeight { ElementMoveAnimation {} }
-            Behavior on opacity { ElementMoveAnimation {} }
+                    MaterialSymbol {
+                        text: "expand_more"
+                        iconSize: 20
+                        color: Appearance.colors.colOnLayer1
+                        rotation: stageEditor.expanded ? 180 : 0
 
-            ColumnLayout {
-                id: stageDetails
-
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    top: parent.top
-                    leftMargin: Appearance.spacing.small
-                    rightMargin: Appearance.spacing.small
-                    topMargin: Appearance.spacing.xSmall
-                }
-                spacing: Appearance.spacing.small
-
-                Text {
-                    Layout.fillWidth: true
-                    text: stageEditor.stageDescription
-                    color: Appearance.colors.colOnLayer1
-                    font.family: Sizes.fontFamily
-                    font.pixelSize: 12
-                    wrapMode: Text.Wrap
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Appearance.spacing.small
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "等待时间"
-                        color: Appearance.colors.colOnLayer2
-                        font.family: Sizes.fontFamily
-                        font.pixelSize: 13
+                        Behavior on rotation { ElementMoveAnimation {} }
                     }
 
-                    ComboBox {
-                        id: timeoutCombo
-
-                        Layout.preferredWidth: 132
-                        model: panelRoot.timeoutOptions(stageEditor.stageTimeout)
-                        textRole: "label"
-                        valueRole: "seconds"
-                        currentIndex: {
-                            const options = panelRoot.timeoutOptions(stageEditor.stageTimeout);
-                            return options.findIndex(option => option.seconds === stageEditor.stageTimeout);
-                        }
+                    StyledSwitch {
+                        scale: 0.72
+                        checked: stageEditor.stageEnabled
                         enabled: IdleService.policyReady
-                        Material.theme: Material.System
-                        Material.accent: Appearance.colors.colPrimary
-                        onActivated: IdleService.configureStage(
+                        Accessible.name: stageEditor.stageTitle
+                        onToggled: IdleService.configureStage(
                             stageEditor.stageName,
-                            stageEditor.stageEnabled,
-                            Number(currentValue),
+                            checked,
+                            stageEditor.stageTimeout,
                             stageEditor.respectInhibitors
                         )
                     }
                 }
+            }
 
-                SettingsRow {
-                    Layout.fillWidth: true
-                    iconName: "coffee"
-                    title: "保持唤醒时跳过"
-                    supportingText: "关闭后，此阶段不受咖啡因开关影响"
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: stageEditor.expanded
+                    ? stageDetails.implicitHeight + Appearance.spacing.medium * 2
+                    : 0
+                opacity: stageEditor.expanded ? 1 : 0
+                enabled: stageEditor.expanded
+                clip: true
+                radius: Appearance.rounding.normal
+                color: Appearance.colors.colLayer2
 
-                    trailing: StyledSwitch {
-                        scale: 0.68
-                        checked: stageEditor.respectInhibitors
-                        enabled: IdleService.policyReady
-                        Accessible.name: stageEditor.stageTitle + "遵循保持唤醒"
-                        onToggled: IdleService.configureStage(
-                            stageEditor.stageName,
-                            stageEditor.stageEnabled,
-                            stageEditor.stageTimeout,
-                            checked
-                        )
-                    }
-                }
+                Behavior on Layout.preferredHeight { ElementMoveAnimation {} }
+                Behavior on opacity { ElementMoveAnimation {} }
 
                 ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: stageEditor.showDimFraction
-                    spacing: 0
+                    id: stageDetails
+
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        margins: Appearance.spacing.medium
+                    }
+                    spacing: Appearance.spacing.small
 
                     RowLayout {
                         Layout.fillWidth: true
+                        spacing: Appearance.spacing.small
 
                         Text {
                             Layout.fillWidth: true
+                            text: "等待时间"
+                            color: Appearance.colors.colOnLayer2
+                            font.family: Sizes.fontFamily
+                            font.pixelSize: 13
+                        }
+
+                        SearchSelectMenuField {
+                            Layout.preferredWidth: 144
+                            Layout.preferredHeight: 40
+                            options: panelRoot.timeoutOptions(stageEditor.stageTimeout)
+                            value: String(stageEditor.stageTimeout)
+                            textRole: "label"
+                            valueRole: "seconds"
+                            maxVisibleItems: 5
+                            closeOnAccept: true
+                            Accessible.name: stageEditor.stageTitle + "等待时间"
+                            onAccepted: value => IdleService.configureStage(
+                                stageEditor.stageName,
+                                stageEditor.stageEnabled,
+                                Number(value),
+                                stageEditor.respectInhibitors
+                            )
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: stageEditor.showDimFraction
+                        spacing: Appearance.spacing.small
+
+                        Text {
                             text: "调暗比例"
                             color: Appearance.colors.colOnLayer2
                             font.family: Sizes.fontFamily
                             font.pixelSize: 13
                         }
 
-                        Text {
-                            text: Math.round(IdleService.dimFraction * 100) + "%"
-                            color: Appearance.colors.colPrimary
-                            font.family: Sizes.fontFamilyMono
-                            font.pixelSize: 12
+                        MaterialSplitSlider {
+                            id: dimFractionSlider
+
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 148
+                            configuration: MaterialSplitSlider.Configuration.XS
+                            from: 0.1
+                            to: 0.8
+                            stepSize: 0.05
+                            stopIndicatorValues: []
+                            usePercentTooltip: false
+                            tooltipContent: Math.round(value * 100) + "%"
+                            Accessible.name: "屏幕调暗比例"
+
+                            Binding {
+                                target: dimFractionSlider
+                                property: "value"
+                                value: IdleService.dimFraction
+                                when: !dimFractionSlider.pressed
+                            }
+
+                            onMoved: {
+                                panelRoot.pendingDimFraction = value;
+                                dimFractionCommitTimer.restart();
+                            }
                         }
                     }
 
-                    MaterialAccessibleSlider {
+                    SettingsRow {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 56
-                        from: 0.1
-                        to: 0.8
-                        stepSize: 0.05
-                        value: IdleService.dimFraction
-                        showValueIndicator: true
-                        accessibleName: "屏幕调暗比例"
-                        valueFormatter: value => Math.round(value * 100) + "%"
-                        onMoved: {
-                            panelRoot.pendingDimFraction = value;
-                            dimFractionCommitTimer.restart();
+                        iconName: "coffee"
+                        title: "保持唤醒时跳过"
+
+                        trailing: StyledSwitch {
+                            scale: 0.68
+                            checked: stageEditor.respectInhibitors
+                            enabled: IdleService.policyReady
+                            Accessible.name: stageEditor.stageTitle + "遵循保持唤醒"
+                            onToggled: IdleService.configureStage(
+                                stageEditor.stageName,
+                                stageEditor.stageEnabled,
+                                stageEditor.stageTimeout,
+                                checked
+                            )
                         }
                     }
                 }
