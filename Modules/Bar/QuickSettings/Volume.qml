@@ -57,6 +57,6 @@ Item {
     PopupToolTip {
         extraVisibleCondition: mouseArea.containsMouse
         text: (Volume.sinkMuted ? "音量: 静音" : "音量: " + Math.round(Volume.sinkVolume * 100) + "%")
-              + "\n滚轮调节，点击打开音频"
+              + "\n滚轮调节，点击打开声音"
     }
 }

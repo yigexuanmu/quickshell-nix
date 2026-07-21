@@ -42,10 +42,10 @@ Item {
         onClicked: {
             if (root.screen && root.screen.name)
                 WidgetState.qsScreenName = root.screen.name;
-            if (WidgetState.qsOpen && WidgetState.qsView === "audio") {
+            if (WidgetState.qsOpen && WidgetState.qsView === "microphone") {
                 WidgetState.qsOpen = false;
             } else {
-                WidgetState.qsView = "audio";
+                WidgetState.qsView = "microphone";
                 WidgetState.qsOpen = true;
             }
         }
@@ -54,6 +54,6 @@ Item {
     PopupToolTip {
         extraVisibleCondition: mouseArea.containsMouse
         text: (Volume.sourceMuted ? "麦克风: 静音" : "麦克风: " + Math.round(Volume.sourceVolume * 100) + "%")
-              + "\n滚轮调节，点击打开音频"
+              + "\n滚轮调节，点击打开麦克风"
     }
 }

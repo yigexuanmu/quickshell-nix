@@ -99,6 +99,18 @@ Singleton {
             || "未知音频设备";
     }
 
+    function applicationDisplayName(node) {
+        if (!node)
+            return "未知应用";
+
+        const properties = root.nodeProperties(node);
+        return properties["application.name"]
+            || properties["application.process.binary"]
+            || node.nickname
+            || node.name
+            || "未知应用";
+    }
+
     function nodeSupportingText(node) {
         if (!node)
             return "";

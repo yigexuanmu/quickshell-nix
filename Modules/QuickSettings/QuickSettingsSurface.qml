@@ -191,8 +191,10 @@ WidgetPanel {
             view = "bluetooth";
         else if (type === "caffeine")
             view = "idle";
-        else if (type === "audio" || type === "mic")
+        else if (type === "audio")
             view = "audio";
+        else if (type === "mic")
+            view = "microphone";
 
         if (view.length === 0)
             return;

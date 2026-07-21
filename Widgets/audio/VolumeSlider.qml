@@ -16,6 +16,7 @@ Item {
     property real volume: 0
     property bool muted: false
     property bool available: true
+    property bool showMuteButton: false
     readonly property string mutedIconName: root.iconName === "mic" ? "mic_off" : "volume_off"
 
     signal volumeMoved(real volume)
@@ -105,6 +106,7 @@ Item {
             ToolButton {
                 Layout.preferredWidth: 40
                 Layout.preferredHeight: 40
+                visible: root.showMuteButton
                 enabled: root.available
                 hoverEnabled: true
                 Accessible.name: root.muted ? "取消静音 " + root.title : "静音 " + root.title
@@ -120,7 +122,7 @@ Item {
                 }
 
                 contentItem: MaterialSymbol {
-                    text: root.muted ? root.mutedIconName : root.iconName
+                    text: "volume_off"
                     iconSize: 20
                     fill: root.muted ? 1 : 0
                     color: root.muted
@@ -128,8 +130,10 @@ Item {
                         : Appearance.colors.colOnLayer2
                 }
 
-                ToolTip.visible: hovered
-                ToolTip.text: root.muted ? "取消静音" : "静音"
+                StyledToolTip {
+                    text: root.muted ? "取消静音" : "静音"
+                    extraVisibleCondition: parent.hovered
+                }
             }
         }
 

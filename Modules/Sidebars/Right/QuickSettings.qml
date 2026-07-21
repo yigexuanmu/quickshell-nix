@@ -44,6 +44,15 @@ Item {
 
     PageTransitionLayer {
         anchors.fill: parent
+        active: WidgetState.qsView === "microphone"
+
+        MicrophoneContent {
+            anchors.fill: parent
+        }
+    }
+
+    PageTransitionLayer {
+        anchors.fill: parent
         active: WidgetState.qsView === "settings"
         hubPage: true
 
