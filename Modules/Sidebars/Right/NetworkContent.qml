@@ -321,15 +321,33 @@ WidgetPanel {
                         }
                     }
 
-                    Repeater {
+                    StyledListView {
+                        id: availableNetworkList
+
+                        readonly property real baseContentHeight: count * 64
+                            + Math.max(0, count - 1) * spacing
+
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(
+                            Sizes.sidebarChoiceListMaxHeight,
+                            Math.max(baseContentHeight, contentHeight)
+                        )
+                        visible: count > 0
+                        spacing: Appearance.spacing.xSmall
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+                        smoothWheelEnabled: interactive
                         model: NetworkService.availableWifiNetworks
 
-                        WifiNetworkItem {
+                        delegate: WifiNetworkItem {
                             required property var modelData
 
-                            Layout.fillWidth: true
+                            width: ListView.view.width
                             wifiNetwork: modelData
                         }
+
+                        Behavior on Layout.preferredHeight { ElementMoveAnimation {} }
                     }
 
                     SettingsRow {

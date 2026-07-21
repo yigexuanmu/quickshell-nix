@@ -296,16 +296,34 @@ WidgetPanel {
                         }
                     }
 
-                    Repeater {
+                    StyledListView {
+                        id: availableDeviceList
+
+                        readonly property real baseContentHeight: count * 56
+                            + Math.max(0, count - 1) * spacing
+
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(
+                            Sizes.sidebarChoiceListMaxHeight,
+                            Math.max(baseContentHeight, contentHeight)
+                        )
+                        visible: count > 0
+                        spacing: Appearance.spacing.xSmall
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+                        smoothWheelEnabled: interactive
                         model: BluetoothService.availableDevices
 
-                        BluetoothDeviceRow {
+                        delegate: BluetoothDeviceRow {
                             required property var modelData
 
-                            Layout.fillWidth: true
+                            width: ListView.view.width
                             deviceData: modelData
                             deviceCategory: "available"
                         }
+
+                        Behavior on Layout.preferredHeight { ElementMoveAnimation {} }
                     }
 
                     SettingsRow {
