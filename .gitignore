@@ -12,7 +12,8 @@
 skills-lock.json
 
 # Vendored/generated icon packs
-assets/icons/weather/meteocons/
+assets/icons/weather/meteocons/*
+!assets/icons/weather/meteocons/.gitkeep
 
 # C++/Qt build outputs
 core/build*/
