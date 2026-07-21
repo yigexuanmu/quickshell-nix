@@ -6,7 +6,7 @@ QtObject {
     id: root
 
     property bool qsOpen: false
-    property string qsView: "network"
+    property string qsView: "settings"
     property string qsScreenName: ""
 
     property bool leftSidebarOpen: false

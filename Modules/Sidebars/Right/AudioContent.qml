@@ -11,6 +11,8 @@ WidgetPanel {
     title: "混音器"
     icon: "tune"
     closeAction: () => WidgetState.qsOpen = false
+    showBackButton: true
+    backAction: () => WidgetState.qsView = "settings"
     property bool isActive: WidgetState.qsOpen && WidgetState.qsView === "audio"
 
     headerTools: Text {

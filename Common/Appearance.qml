@@ -265,6 +265,10 @@ Singleton {
     }
 
     spacing: QtObject {
+        property int xSmall: 4
+        property int small: 8
+        property int medium: 16
+        property int large: 24
         property int panelPadding: 20
     }
 

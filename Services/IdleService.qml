@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import qs.Common
 
 Singleton {
     id: root
@@ -27,6 +28,12 @@ Singleton {
     property bool suspendEnabled: false
     property real suspendTimeout: 1800
     property bool suspendRespectInhibitors: true
+
+    readonly property string policyConfigDir: Paths.homeDir + "/.cache/quickshell"
+    readonly property string policyConfigPath: policyConfigDir + "/idle-policy.json"
+    readonly property bool policyReady: policyStoreReady && !policyLoading
+    property bool policyStoreReady: false
+    property bool policyLoading: true
 
     property alias inhibited: persistentState.inhibited
     property bool dimmed: false
@@ -101,6 +108,28 @@ Singleton {
         root.toggleInhibited();
     }
 
+    function setPolicyEnabled(value) {
+        const requested = !!value;
+        if (root.policyEnabled === requested)
+            return;
+        root.lastError = "";
+        root.operationStarted("set-policy-enabled");
+        root.policyEnabled = requested;
+        root.savePolicy();
+        root.operationSucceeded("set-policy-enabled");
+    }
+
+    function setDimFraction(value) {
+        const requested = Math.max(0.05, Math.min(1, Number(value || 0)));
+        if (Math.abs(root.dimFraction - requested) < 0.0001)
+            return;
+        root.lastError = "";
+        root.operationStarted("set-dim-fraction");
+        root.dimFraction = requested;
+        root.savePolicy();
+        root.operationSucceeded("set-dim-fraction");
+    }
+
     function configureStage(stage, enabled, timeout, respectInhibitors = true) {
         const name = String(stage || "");
         if (["dim", "lock", "displayOff", "suspend"].indexOf(name) === -1) {
@@ -110,9 +139,89 @@ Singleton {
         }
 
         const normalizedTimeout = Math.max(0, Number(timeout || 0));
+        root.lastError = "";
+        root.operationStarted("configure-stage");
         root[name + "Enabled"] = !!enabled;
         root[name + "Timeout"] = normalizedTimeout;
         root[name + "RespectInhibitors"] = !!respectInhibitors;
+        root.savePolicy();
+        root.operationSucceeded("configure-stage");
+    }
+
+    function _policyDefaults() {
+        return {
+            "policyEnabled": true,
+            "dimEnabled": false,
+            "dimTimeout": 300,
+            "dimRespectInhibitors": true,
+            "dimFraction": 0.35,
+            "lockEnabled": true,
+            "lockTimeout": 600,
+            "lockRespectInhibitors": true,
+            "displayOffEnabled": true,
+            "displayOffTimeout": 900,
+            "displayOffRespectInhibitors": true,
+            "suspendEnabled": false,
+            "suspendTimeout": 1800,
+            "suspendRespectInhibitors": true
+        };
+    }
+
+    function _policyBool(data, key, fallback) {
+        return typeof data[key] === "boolean" ? data[key] : fallback;
+    }
+
+    function _policyNumber(data, key, fallback, minimum, maximum) {
+        const value = Number(data[key]);
+        if (!Number.isFinite(value))
+            return fallback;
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    function loadPolicy(data) {
+        const values = data && typeof data === "object" ? data : {};
+        const defaults = root._policyDefaults();
+        root.policyLoading = true;
+        root.policyEnabled = root._policyBool(values, "policyEnabled", defaults.policyEnabled);
+        root.dimEnabled = root._policyBool(values, "dimEnabled", defaults.dimEnabled);
+        root.dimTimeout = root._policyNumber(values, "dimTimeout", defaults.dimTimeout, 0, 86400);
+        root.dimRespectInhibitors = root._policyBool(values, "dimRespectInhibitors", defaults.dimRespectInhibitors);
+        root.dimFraction = root._policyNumber(values, "dimFraction", defaults.dimFraction, 0.05, 1);
+        root.lockEnabled = root._policyBool(values, "lockEnabled", defaults.lockEnabled);
+        root.lockTimeout = root._policyNumber(values, "lockTimeout", defaults.lockTimeout, 0, 86400);
+        root.lockRespectInhibitors = root._policyBool(values, "lockRespectInhibitors", defaults.lockRespectInhibitors);
+        root.displayOffEnabled = root._policyBool(values, "displayOffEnabled", defaults.displayOffEnabled);
+        root.displayOffTimeout = root._policyNumber(values, "displayOffTimeout", defaults.displayOffTimeout, 0, 86400);
+        root.displayOffRespectInhibitors = root._policyBool(values, "displayOffRespectInhibitors", defaults.displayOffRespectInhibitors);
+        root.suspendEnabled = root._policyBool(values, "suspendEnabled", defaults.suspendEnabled);
+        root.suspendTimeout = root._policyNumber(values, "suspendTimeout", defaults.suspendTimeout, 0, 86400);
+        root.suspendRespectInhibitors = root._policyBool(values, "suspendRespectInhibitors", defaults.suspendRespectInhibitors);
+        root.policyLoading = false;
+    }
+
+    function policyJson() {
+        return {
+            "policyEnabled": root.policyEnabled,
+            "dimEnabled": root.dimEnabled,
+            "dimTimeout": root.dimTimeout,
+            "dimRespectInhibitors": root.dimRespectInhibitors,
+            "dimFraction": root.dimFraction,
+            "lockEnabled": root.lockEnabled,
+            "lockTimeout": root.lockTimeout,
+            "lockRespectInhibitors": root.lockRespectInhibitors,
+            "displayOffEnabled": root.displayOffEnabled,
+            "displayOffTimeout": root.displayOffTimeout,
+            "displayOffRespectInhibitors": root.displayOffRespectInhibitors,
+            "suspendEnabled": root.suspendEnabled,
+            "suspendTimeout": root.suspendTimeout,
+            "suspendRespectInhibitors": root.suspendRespectInhibitors
+        };
+    }
+
+    function savePolicy() {
+        if (!root.policyStoreReady || root.policyLoading)
+            return;
+        policyFile.setText(JSON.stringify(root.policyJson(), null, 2));
     }
 
     function _monitorEnabled(stageEnabled, timeout, respectInhibitors) {
@@ -256,6 +365,44 @@ Singleton {
         onIsIdleChanged: {
             if (isIdle)
                 root._requestSuspend();
+        }
+    }
+
+    Process {
+        id: ensurePolicyStore
+
+        command: ["mkdir", "-p", root.policyConfigDir]
+        running: true
+        onExited: {
+            root.policyStoreReady = true;
+            policyFile.reload();
+        }
+    }
+
+    FileView {
+        id: policyFile
+
+        path: root.policyConfigPath
+        blockLoading: true
+        blockWrites: true
+        atomicWrites: true
+
+        onLoaded: {
+            let repair = false;
+            try {
+                root.loadPolicy(JSON.parse(policyFile.text().trim() || "{}"));
+            } catch (error) {
+                console.log("IdleService failed to load policy:", error);
+                root.loadPolicy({});
+                repair = true;
+            }
+            if (repair)
+                root.savePolicy();
+        }
+
+        onLoadFailed: {
+            root.loadPolicy({});
+            root.savePolicy();
         }
     }
 

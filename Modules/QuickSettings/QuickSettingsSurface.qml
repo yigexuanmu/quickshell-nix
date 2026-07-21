@@ -66,7 +66,11 @@ WidgetPanel {
     }
 
     function hasAltActionForType(type) {
-        return type === "network" || type === "audio" || type === "mic";
+        return type === "network"
+            || type === "bluetooth"
+            || type === "caffeine"
+            || type === "audio"
+            || type === "mic";
     }
 
     function titleForType(type) {
@@ -180,20 +184,27 @@ WidgetPanel {
     }
 
     function altType(type) {
-        if (type === "network") {
-            WidgetState.qsView = "network";
-            WidgetState.qsOpen = true;
-        } else if (type === "audio" || type === "mic") {
-            WidgetState.qsView = "audio";
-            WidgetState.qsOpen = true;
-        }
+        let view = "";
+        if (type === "network")
+            view = "network";
+        else if (type === "bluetooth")
+            view = "bluetooth";
+        else if (type === "caffeine")
+            view = "idle";
+        else if (type === "audio" || type === "mic")
+            view = "audio";
+
+        if (view.length === 0)
+            return;
+        WidgetState.qsView = view;
+        WidgetState.qsOpen = true;
     }
 
     function tooltipForType(type) {
         const base = titleForType(type) + " | " + subtitleForType(type);
         if (root.editMode)
             return base + "\n右键切换形状，滚轮调整顺序";
-        if (type === "network" || type === "audio" || type === "mic")
+        if (root.hasAltActionForType(type))
             return base + "\n右键打开详情面板";
         return base;
     }
