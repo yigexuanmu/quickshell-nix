@@ -149,12 +149,21 @@ EOF
             --strip-components=1 --wildcards 'package/fill/*' 'package/flat/*' 'package/line/*' 'package/monochrome/*'
 
           mkdir -p $out/bin
+          mkdir -p $out/etc
+          cat > $out/etc/fonts.conf << EOF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <dir>${pkgs.material-symbols}/share/fonts</dir>
+</fontconfig>
+EOF
           makeWrapper ${lib.getExe pkgs.quickshell} $out/bin/quickshell-desktop \
             --prefix PATH : ${clavis-core}/bin \
             --prefix QML2_IMPORT_PATH : ${clavis-core}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qt5compat}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qtlottie}/${qt6.qtbase.qtQmlPrefix} \
-            --prefix XDG_DATA_DIRS : ${pkgs.material-symbols}/share \
+            --set FONTCONFIG_FILE $out/etc/fonts.conf \
             --add-flags "-p" --add-flags "$out/share/quickshell/shell.qml"
 
           ln -s $out/bin/quickshell-desktop $out/bin/qs
@@ -188,6 +197,7 @@ EOF
 
       nixosModules.default = { pkgs, ... }: {
         environment.systemPackages = [ self.packages.${pkgs.system}.default ];
+        fonts.packages = [ pkgs.material-symbols ];
       };
     };
 }
