@@ -154,6 +154,7 @@ EOF
             --prefix QML2_IMPORT_PATH : ${clavis-core}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qt5compat}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qtlottie}/${qt6.qtbase.qtQmlPrefix} \
+            --prefix XDG_DATA_DIRS : ${pkgs.material-symbols}/share \
             --add-flags "-p" --add-flags "$out/share/quickshell/shell.qml"
 
           ln -s $out/bin/quickshell-desktop $out/bin/qs
