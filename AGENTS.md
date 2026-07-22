@@ -73,8 +73,8 @@ Qt/C++ plugin 统一位于 `core/`：可复用 backend 代码在 `core/src/`，Q
 
 - 与 UI 无关的 backend、provider、calculator 放在 `core/src/`。
 - 面向 QML 的包装层放在 `core/plugin/<name>/`。
-- plugin 构建完成后，如需让系统里的 Quickshell 正常 `import`，必须将构建出的 `Clavis/` 目录复制到 `/usr/lib64/qt6/qml/`：
-  `sudo cp -r core/build/Clavis /usr/lib64/qt6/qml/`
+- plugin 构建完成后，如需让系统里的 Quickshell 正常 `import`，必须将构建出的 `Clavis/` 和 `M3Shapes/` 目录复制到 `/usr/lib64/qt6/qml/`：
+  `sudo cp -a core/build/Clavis core/build/M3Shapes /usr/lib64/qt6/qml/`
 - QML 中使用自制 plugin 时，直接按其 URI import，例如：
   `import Clavis.Sysmon 1.0`
 - 若只改了 QML，不需要重编译 plugin；若改动涉及 `core/src/` 或 `core/plugin/`，则需要重新构建并重新复制安装。
@@ -84,7 +84,7 @@ Qt/C++ plugin 统一位于 `core/`：可复用 backend 代码在 `core/src/`，Q
 - `qs`：运行当前这套 Quickshell 配置并直接查看输出结果。
 - `cmake -S core -B core/build`：配置 Qt 6/CMake plugins。
 - `cmake --build core/build`：构建 C++ plugin backend。
-- `sudo cp -r core/build/Clavis /usr/lib64/qt6/qml/`：安装编译后的 plugin，以便 Quickshell 正常 import。
+- `sudo cp -a core/build/Clavis core/build/M3Shapes /usr/lib64/qt6/qml/`：安装编译后的 plugin，以便 Quickshell 正常 import。
 
 除非另有说明，请从仓库根目录运行这些命令。
 

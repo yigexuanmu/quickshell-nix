@@ -25,6 +25,32 @@ target_link_libraries(audio_visual_analyzer_tests PRIVATE
 
 add_test(NAME audio_visual_analyzer_tests COMMAND audio_visual_analyzer_tests)
 
+qt_add_executable(m3shapes_tests
+    m3shapes_test.cpp
+)
+
+target_link_libraries(m3shapes_tests PRIVATE
+    M3ShapesCore
+    M3ShapesMorph
+    M3ShapesGeometry
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Qml
+    Qt6::Quick
+    Qt6::Test
+)
+
+target_compile_features(m3shapes_tests PRIVATE cxx_std_20)
+target_compile_definitions(m3shapes_tests PRIVATE
+    M3SHAPES_IMPORT_PATH="$<SHELL_PATH:${CMAKE_BINARY_DIR}>"
+)
+add_dependencies(m3shapes_tests M3Shapes)
+
+add_test(NAME m3shapes_tests COMMAND m3shapes_tests)
+set_tests_properties(m3shapes_tests PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 foreach(tool_target IN ITEMS fake_gsr fake_ffmpeg fake_ffprobe fake_pactl)
     qt_add_executable(${tool_target}
         fake_recording_tool.cpp
