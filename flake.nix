@@ -161,7 +161,7 @@ EOF
           # Patch MaterialSymbol.qml to enable OpenType ligatures and use QtRendering
           sed -i 's/renderType: Text.NativeRendering/renderType: Text.QtRendering/' \
             $out/share/quickshell/Components/MaterialSymbol.qml
-          sed -i '/font {/a\        features: {"rlig": true},' \
+          sed -i '/font {/a\        features: {"rlig": true}' \
             $out/share/quickshell/Components/MaterialSymbol.qml
           makeWrapper ${lib.getExe pkgs.quickshell} $out/bin/quickshell-desktop \
             --prefix PATH : ${clavis-core}/bin \
