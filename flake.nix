@@ -98,6 +98,10 @@ EOF
             [ -d "$p/Clavis" ] && cp -r "$p/Clavis" $out/${qt6.qtbase.qtQmlPrefix}/
             [ -d "$p/M3Shapes" ] && cp -r "$p/M3Shapes" $out/${qt6.qtbase.qtQmlPrefix}/
           done
+          for p in build .; do
+            [ -f "$p/plugin/m3shapes/libM3Shapes.so" ] && cp "$p/plugin/m3shapes/libM3Shapes.so" \
+              $out/${qt6.qtbase.qtQmlPrefix}/M3Shapes/
+          done
           find $out -name '*.so' -exec patchelf --add-rpath '$ORIGIN' {} \;
           runHook postInstall
         '';
