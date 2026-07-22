@@ -35,15 +35,20 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    quickshell-nix.url = "github:yigexuanmu/quickshell-nix";
-    quickshell-nix.inputs.nixpkgs.follows = "nixpkgs";
+    quickshell-nix = {
+      url = "github:yigexuanmu/quickshell-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, quickshell-nix, ... }: {
-    nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixpkgs, quickshell-nix, ... }: let
+    inherit (nixpkgs.lib) nixosSystem;
+    system = "x86_64-linux";
+  in {
+    nixosConfigurations.HOSTNAME = nixosSystem {
+      inherit system;
       modules = [
-        # systemPackages 中已包含 quickshell-desktop
-        { environment.systemPackages = [ quickshell-nix.packages.${pkgs.system}.default ]; }
+        { environment.systemPackages = [ quickshell-nix.packages.${system}.default ]; }
       ];
     };
   };
