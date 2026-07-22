@@ -69,6 +69,7 @@ EOF
           cmake
           ninja
           pkg-config
+          patchelf
           qt6.qtshadertools
         ];
 
@@ -97,6 +98,7 @@ EOF
             [ -d "$p/Clavis" ] && cp -r "$p/Clavis" $out/${qt6.qtbase.qtQmlPrefix}/
             [ -d "$p/M3Shapes" ] && cp -r "$p/M3Shapes" $out/${qt6.qtbase.qtQmlPrefix}/
           done
+          find $out -name '*.so' -exec patchelf --add-rpath '$ORIGIN' {} \;
           runHook postInstall
         '';
 
