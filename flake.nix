@@ -142,6 +142,7 @@ EOF
 
           mkdir -p $out/bin
           makeWrapper ${lib.getExe pkgs.quickshell} $out/bin/quickshell-desktop \
+            --prefix PATH : ${clavis-core}/bin \
             --prefix QML2_IMPORT_PATH : ${clavis-core}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qt5compat}/${qt6.qtbase.qtQmlPrefix} \
             --prefix QML2_IMPORT_PATH : ${qt6.qtlottie}/${qt6.qtbase.qtQmlPrefix} \
