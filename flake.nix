@@ -137,8 +137,7 @@ EOF
           mkdir -p $out/bin
           makeWrapper ${lib.getExe pkgs.quickshell} $out/bin/quickshell-desktop \
             --prefix QML2_IMPORT_PATH : ${clavis-core}/${qt6.qtbase.qtQmlPrefix} \
-            --add-flags "-P" --add-flags "$out/share/quickshell" \
-            --add-flags "$out/share/quickshell/shell.qml"
+            --add-flags "-p" --add-flags "$out/share/quickshell/shell.qml"
 
           ln -s $out/bin/quickshell-desktop $out/bin/qs
         '';
