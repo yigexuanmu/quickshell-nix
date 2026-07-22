@@ -168,5 +168,9 @@ EOF
           program = "${quickshell-desktop}/bin/quickshell-desktop";
         };
       };
+
+      nixosModules.default = { pkgs, ... }: {
+        environment.systemPackages = [ self.packages.${pkgs.system}.default ];
+      };
     };
 }

@@ -48,7 +48,7 @@
     nixosConfigurations.HOSTNAME = nixosSystem {
       inherit system;
       modules = [
-        { environment.systemPackages = [ quickshell-nix.packages.${system}.default ]; }
+        quickshell-nix.nixosModules.default
       ];
     };
   };
