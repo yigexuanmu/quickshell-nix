@@ -118,6 +118,11 @@ EOF
         hash = "sha256-Q+onMqvejkKcT8VqJ7ss79hT+MNKkEtX+GpLWivxoT0=";
       };
 
+      meteocons-svg = pkgs.fetchurl {
+        url = "https://registry.npmjs.org/@meteocons/svg/-/svg-0.1.0.tgz";
+        hash = "sha256-kbSNH4SX2ej07R1bzDLTBqqlBQ3pnDhGfCpY963VpQE=";
+      };
+
       quickshell-desktop = pkgs.stdenv.mkDerivation {
         pname = "quickshell-desktop";
         version = "0.1.0";
@@ -138,6 +143,9 @@ EOF
           rm -f $out/share/quickshell/.gitignore
           mkdir -p $out/share/quickshell/assets/icons/weather/meteocons/lottie
           tar xzf ${meteocons-lottie} -C $out/share/quickshell/assets/icons/weather/meteocons/lottie \
+            --strip-components=1 --wildcards 'package/fill/*' 'package/flat/*' 'package/line/*' 'package/monochrome/*'
+          mkdir -p $out/share/quickshell/assets/icons/weather/meteocons/svg
+          tar xzf ${meteocons-svg} -C $out/share/quickshell/assets/icons/weather/meteocons/svg \
             --strip-components=1 --wildcards 'package/fill/*' 'package/flat/*' 'package/line/*' 'package/monochrome/*'
 
           mkdir -p $out/bin
@@ -166,7 +174,7 @@ EOF
       };
     in {
       packages.${system} = {
-        inherit clavis-core cava-lib meteocons-lottie quickshell-desktop;
+        inherit clavis-core cava-lib meteocons-lottie meteocons-svg quickshell-desktop;
         default = quickshell-desktop;
       };
 
